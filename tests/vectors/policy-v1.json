@@ -1,0 +1,1682 @@
+{
+  "schema_version": 1,
+  "provenance": "Expected decisions authored from spec/treasury-v0.md; no production policy invocation or oracle implementation generates expected values.",
+  "actors": {
+    "owner": "1",
+    "delegate": "2",
+    "recipient": "3",
+    "stranger": "4"
+  },
+  "vectors": [
+    {
+      "name": "spend_positive",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "7",
+        "new_spent": "16"
+      }
+    },
+    {
+      "name": "zero_amount",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "0",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidAmount"
+      }
+    },
+    {
+      "name": "max_amount_over_cap",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "CapExceeded"
+      }
+    },
+    {
+      "name": "exact_remaining",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "16",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "16",
+        "new_spent": "25"
+      }
+    },
+    {
+      "name": "one_over_remaining",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "17",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "CapExceeded"
+      }
+    },
+    {
+      "name": "fully_spent",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "25",
+        "expires_at": "200",
+        "active": true,
+        "amount": "1",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "CapExceeded"
+      }
+    },
+    {
+      "name": "full_cap_from_zero",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "0",
+        "expires_at": "200",
+        "active": true,
+        "amount": "25",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "25",
+        "new_spent": "25"
+      }
+    },
+    {
+      "name": "max_cap_from_zero",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "spent": "0",
+        "expires_at": "200",
+        "active": true,
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "new_spent": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      }
+    },
+    {
+      "name": "last_wei_at_max",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "spent": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+        "expires_at": "200",
+        "active": true,
+        "amount": "1",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "1",
+        "new_spent": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      }
+    },
+    {
+      "name": "one_over_max_remaining",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "spent": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+        "expires_at": "200",
+        "active": true,
+        "amount": "2",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "CapExceeded"
+      }
+    },
+    {
+      "name": "overflow_attempt_rejected",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "spent": "1",
+        "expires_at": "200",
+        "active": true,
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "CapExceeded"
+      }
+    },
+    {
+      "name": "corrupt_spent",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "26",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidGrantState"
+      }
+    },
+    {
+      "name": "zero_cap",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "0",
+        "spent": "0",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidGrantState"
+      }
+    },
+    {
+      "name": "expiry_before_now",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "99",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Expired"
+      }
+    },
+    {
+      "name": "expiry_equal_now",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "100",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Expired"
+      }
+    },
+    {
+      "name": "expiry_after_now",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "101",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "7",
+        "new_spent": "16"
+      }
+    },
+    {
+      "name": "last_timestamp_before_expiry",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "7",
+        "new_spent": "16"
+      }
+    },
+    {
+      "name": "max_timestamp_equal_expiry",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Expired"
+      }
+    },
+    {
+      "name": "wrong_caller",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "4",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Unauthorized"
+      }
+    },
+    {
+      "name": "inactive",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": false,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InactiveGrant"
+      }
+    },
+    {
+      "name": "missing",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": false,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "zero_id_is_never_known",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "0",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "zero_map_entry",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "0",
+        "now": "100",
+        "available": "100",
+        "id": "0",
+        "exists": false,
+        "delegate": "0",
+        "recipient": "0",
+        "cap": "0",
+        "spent": "0",
+        "expires_at": "0",
+        "active": false,
+        "amount": "0",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "corrupt_recipient",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "0",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidGrantState"
+      }
+    },
+    {
+      "name": "zero_delegate_cannot_authorize",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "0",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "0",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidGrantState"
+      }
+    },
+    {
+      "name": "no_balance",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "0",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InsufficientBalance"
+      }
+    },
+    {
+      "name": "exact_balance",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "7",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "7",
+        "new_spent": "16"
+      }
+    },
+    {
+      "name": "one_wei_short",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "6",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InsufficientBalance"
+      }
+    },
+    {
+      "name": "cap_before_balance",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "0",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "17",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "CapExceeded"
+      }
+    },
+    {
+      "name": "existence_before_authority",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "4",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": false,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "0",
+        "active": false,
+        "amount": "0",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "authority_before_active",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "4",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "0",
+        "active": false,
+        "amount": "0",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Unauthorized"
+      }
+    },
+    {
+      "name": "active_before_amount",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "0",
+        "active": false,
+        "amount": "0",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InactiveGrant"
+      }
+    },
+    {
+      "name": "amount_before_expiry",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "0",
+        "active": true,
+        "amount": "0",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidAmount"
+      }
+    },
+    {
+      "name": "expiry_before_corrupt_budget",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "26",
+        "expires_at": "0",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Expired"
+      }
+    },
+    {
+      "name": "state_before_cap",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "26",
+        "expires_at": "200",
+        "active": true,
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidGrantState"
+      }
+    },
+    {
+      "name": "success_at_later_snapshot",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "16",
+        "expires_at": "200",
+        "active": true,
+        "amount": "9",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "9",
+        "new_spent": "25"
+      }
+    },
+    {
+      "name": "create_positive",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "id": "1",
+        "next_id": "2",
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "0",
+        "expires_at": "200",
+        "exists": true,
+        "active": true
+      }
+    },
+    {
+      "name": "create_wrong_caller",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "4",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Unauthorized"
+      }
+    },
+    {
+      "name": "create_zero_owner",
+      "kind": "create",
+      "input": {
+        "owner": "0",
+        "caller": "0",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidOwner"
+      }
+    },
+    {
+      "name": "create_zero_delegate",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "0",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidAddress"
+      }
+    },
+    {
+      "name": "create_zero_recipient",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "0",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidAddress"
+      }
+    },
+    {
+      "name": "create_zero_cap",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "0",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidAmount"
+      }
+    },
+    {
+      "name": "create_max_cap",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "id": "1",
+        "next_id": "2",
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "spent": "0",
+        "expires_at": "200",
+        "exists": true,
+        "active": true
+      }
+    },
+    {
+      "name": "create_expiry_before",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "99",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidExpiry"
+      }
+    },
+    {
+      "name": "create_expiry_equal",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "100",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidExpiry"
+      }
+    },
+    {
+      "name": "create_expiry_after",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "101",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "id": "1",
+        "next_id": "2",
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "0",
+        "expires_at": "101",
+        "exists": true,
+        "active": true
+      }
+    },
+    {
+      "name": "create_max_expiry",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "id": "1",
+        "next_id": "2",
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "0",
+        "expires_at": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "exists": true,
+        "active": true
+      }
+    },
+    {
+      "name": "create_no_future_timestamp",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidExpiry"
+      }
+    },
+    {
+      "name": "create_zero_next_id",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "0"
+      },
+      "expected": {
+        "error": "GrantIdExhausted"
+      }
+    },
+    {
+      "name": "create_exhausted_id",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "expected": {
+        "error": "GrantIdExhausted"
+      }
+    },
+    {
+      "name": "create_last_id",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "115792089237316195423570985008687907853269984665640564039457584007913129639934"
+      },
+      "expected": {
+        "id": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+        "next_id": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "0",
+        "expires_at": "200",
+        "exists": true,
+        "active": true
+      }
+    },
+    {
+      "name": "create_authority_precedence",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "4",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "0",
+        "recipient": "3",
+        "cap": "0",
+        "spent": "9",
+        "expires_at": "0",
+        "active": true,
+        "amount": "7",
+        "next_id": "0"
+      },
+      "expected": {
+        "error": "Unauthorized"
+      }
+    },
+    {
+      "name": "create_address_precedence",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "0",
+        "cap": "0",
+        "spent": "9",
+        "expires_at": "0",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidAddress"
+      }
+    },
+    {
+      "name": "create_cap_precedence",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "0",
+        "spent": "9",
+        "expires_at": "0",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidAmount"
+      }
+    },
+    {
+      "name": "create_expiry_precedence",
+      "kind": "create",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "0",
+        "active": true,
+        "amount": "7",
+        "next_id": "0"
+      },
+      "expected": {
+        "error": "InvalidExpiry"
+      }
+    },
+    {
+      "name": "revoke_active",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "changed": true
+      }
+    },
+    {
+      "name": "revoke_inactive",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": false,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "changed": false
+      }
+    },
+    {
+      "name": "revoke_missing",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": false,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "revoke_zero_id",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "0",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "revoke_wrong_caller",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "4",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Unauthorized"
+      }
+    },
+    {
+      "name": "revoke_zero_owner",
+      "kind": "revoke",
+      "input": {
+        "owner": "0",
+        "caller": "0",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidOwner"
+      }
+    },
+    {
+      "name": "revoke_authority_before_existence",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "4",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": false,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "Unauthorized"
+      }
+    },
+    {
+      "name": "revoke_does_not_require_valid_budget",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "26",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "changed": true
+      }
+    },
+    {
+      "name": "revoke_after_expiry",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "0",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "changed": true
+      }
+    },
+    {
+      "name": "owner_nonzero",
+      "kind": "owner",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "name": "owner_zero",
+      "kind": "owner",
+      "input": {
+        "owner": "0",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "1",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "InvalidOwner"
+      }
+    },
+    {
+      "name": "spend_reserved_max_id",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "revoke_reserved_max_id",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "error": "UnknownGrant"
+      }
+    },
+    {
+      "name": "spend_largest_allocated_id",
+      "kind": "spend",
+      "input": {
+        "owner": "1",
+        "caller": "2",
+        "now": "100",
+        "available": "100",
+        "id": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "recipient": "3",
+        "amount": "7",
+        "new_spent": "16"
+      }
+    },
+    {
+      "name": "revoke_largest_allocated_id",
+      "kind": "revoke",
+      "input": {
+        "owner": "1",
+        "caller": "1",
+        "now": "100",
+        "available": "100",
+        "id": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+        "exists": true,
+        "delegate": "2",
+        "recipient": "3",
+        "cap": "25",
+        "spent": "9",
+        "expires_at": "200",
+        "active": true,
+        "amount": "7",
+        "next_id": "1"
+      },
+      "expected": {
+        "changed": true
+      }
+    }
+  ]
+}

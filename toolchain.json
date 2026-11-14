@@ -36,7 +36,7 @@
   },
   "evm_fork": "osaka",
   "solidity_version": null,
-  "status": "Phase 0 verified on 2026-11-14; Phase 1 pending.",
+  "status": "Phases 0 and 1 verified on 2026-11-14; Phase 2 pending.",
   "execution": {
     "backend": "sonatina",
     "optimization": "1",
@@ -52,5 +52,6 @@
     "external": []
   },
   "fixture_schema_version": 1,
-  "solidity_usage": "Not used in Phase 0; all deployed contracts are Fe."
+  "solidity_usage": "Not used in Phase 0; all deployed contracts are Fe.",
+  "policy_vectors_schema_version": 1
 }

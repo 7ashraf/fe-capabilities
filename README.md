@@ -1,11 +1,16 @@
 # Fe Capabilities
 
 Build reusable Fe policy components for limited ETH spending permissions, then
-validate their composition in a treasury. Phase 0 is complete: a narrow budget
-effect, a compiler-enforced access pair, and an actual EVM payment path work.
-The grant-based treasury remains to be implemented in subsequent phases.
+validate their composition in a treasury. Phases 0 and 1 are complete: narrow
+access and real local payments are proven, and the pure grant policy passes
+explicit boundary vectors on both EVM and native backends. Persistent treasury
+administration and spending integration are the next phases.
 
-## Run the feasibility checks
+The [treasury specification](spec/treasury-v0.md) and
+[target ABI](spec/treasury-v0.abi.json) are frozen implementation targets.
+Read [the policy API](docs/policy-api.md) and [Phase 1 results](docs/phase1.md).
+
+## Run checks
 
 Requires Python 3, Fe 26.5.0, and Foundry 1.5.1-stable at commit
 `b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2` (`anvil` and `cast` on PATH).
@@ -15,13 +20,16 @@ From this repository root:
 ```sh
 python3 scripts/bootstrap-fe.py
 source scripts/env.sh
+python3 scripts/verify-policy.py
 python3 scripts/verify-phase0.py
 ```
 
 If the pinned compiler is already installed, set `FE_BIN` to its absolute path
 instead of downloading again. The runner verifies its binary digest and version.
-It runs the reference examples, budget and payment tests, expected compilation
-failure, release build, and a fresh local Anvil Osaka chain. It stops that chain
+The policy runner executes 70 explicit vectors on each backend and rejects
+timestamps passed as payment amounts. The Phase 0 runner executes reference
+examples, budget and payment tests, expected compilation failure, release build,
+and a fresh local Anvil Osaka chain. It stops that chain
 after checking real transaction receipts, balances, accounting, and error bytes.
 
 | Demonstrated boundary | Evidence |
@@ -35,18 +43,20 @@ after checking real transaction receipts, balances, accounting, and error bytes.
 `spike/` is a feasibility ingot, not the finished treasury library.
 `reserve` uses a concrete application-owned mutable budget effect and has no EVM
 dependency. `PaymentProbe` is a separate experiment using actual EVM context,
-a fixed recipient, and the standard library's transient mutex. Budget policy and
-payments are not yet integrated into grants.
+a fixed recipient, and the standard library's transient mutex. `policy/` holds the tested pure grant policy with read-only context and typed
+amount/time/identifier values. It returns proposed transitions without mutation.
+Grant policy and payments are not yet integrated into persistent storage.
 
 The trusted boundary assembles capabilities and checks runtime authority. This
-does not sandbox hostile trusted code. No grant store, expiry, treasury-v0 ABI,
-events, callback attack matrix, second consumer, or security audit is complete.
+does not sandbox hostile trusted code. The grant store, runtime expiry enforcement, treasury ABI/event implementation,
+callback attack matrix, second consumer, and security audit remain incomplete.
 No application unsafe code was introduced. The pinned stdlib supplies EVM internals.
 
 Read [the feasibility evidence](docs/feasibility.md),
 [the implementation plan](docs/reference/FE_CAPABILITIES_PLAN.md), and
 [the language reference](docs/reference/FE_AGENT_REFERENCE.md).
-Next: Phase 1, freeze treasury semantics and implement the pure policy slice.
+Next: Phase 2, implement persistent grant storage and administration against
+the frozen interface. Spending and payment composition follow in Phase 3.
 
 ## Repository and provenance
 

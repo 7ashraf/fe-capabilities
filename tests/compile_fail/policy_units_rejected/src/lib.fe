@@ -1,0 +1,30 @@
+use capabilities::{GrantId, Grant, PolicyContext, evaluate_spend}
+use std::evm::{Address, Timestamp, wei}
+
+#[test]
+fn consumer_uses_amount_units() {
+    let grant = Grant {
+        exists: true,
+        delegate: Address::new(2),
+        recipient: Address::new(3),
+        cap: wei(25),
+        spent: wei(9),
+        expires_at: Timestamp::from_seconds(200),
+        active: true,
+    }
+    let context = PolicyContext::new(
+        caller: Address::new(2),
+        now: Timestamp::from_seconds(100),
+        available: wei(100),
+    )
+    with (context) {
+        assert!(
+            evaluate_spend(
+                id: GrantId::from_word(1),
+                grant: grant,
+                amount: Timestamp::from_seconds(7),
+            )
+                .is_ok(),
+        )
+    }
+}

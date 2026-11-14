@@ -2,7 +2,8 @@
 
 **Result: passed locally on 14 November 2026.** The exit gate has a real
 compiler-enforced access boundary and actual ETH payment/rollback evidence.
-Phase 1 has not started. The original plan's earlier dates are historical;
+This is the Phase 0 historical record. Phase 1 subsequently completed; see
+[the policy milestone](phase1.md) for current status. The original plan's earlier dates are historical;
 this record reports the execution date.
 
 ## Reproduction
