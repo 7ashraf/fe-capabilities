@@ -1,0 +1,364 @@
+use treasury::{
+    Treasury,
+    TreasuryMsg,
+    InvalidOwner,
+    Unauthorized,
+    InvalidAddress,
+    InvalidAmount,
+    InvalidExpiry,
+    UnknownGrant,
+}
+use capabilities::{Grant, GrantId, PolicyContext, PolicyError, evaluate_spend}
+use std::evm::{Address, Wei, Timestamp, Call, Ctx, is_error, encode_error, seconds, wei}
+
+fn deploy(owner: Address) -> Address uses (evm: mut Evm) {
+    evm.create2<Treasury>(value: Wei::zero(), args: (owner,), salt: 1)
+}
+
+fn observe(target: Address, id: u256) -> Grant uses (evm: mut Evm) {
+    let (exists, delegate, recipient, cap, spent, expires_at, active): (
+        bool,
+        Address,
+        Address,
+        Wei,
+        Wei,
+        Timestamp,
+        bool,
+    ) = evm
+        .call(
+            addr: target,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TreasuryMsg::GetGrant { grantId: id },
+        )
+    Grant { exists, delegate, recipient, cap, spent, expires_at, active }
+}
+
+fn create(
+    target: Address,
+    delegate: Address,
+    recipient: Address,
+    cap: Wei,
+    expiry: Timestamp,
+) -> u256
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: target,
+        gas: 500000,
+        value: Wei::zero(),
+        message: TreasuryMsg::CreateGrant { delegate, recipient, cap, expiresAt: expiry },
+    )
+}
+
+fn next_id(target: Address) -> u256 uses (evm: mut Evm) {
+    evm.call(
+        addr: target,
+        gas: 100000,
+        value: Wei::zero(),
+        message: TreasuryMsg::NextGrantId {},
+    )
+}
+
+#[test]
+fn persistence_isolation_and_ids_never_reuse() uses (evm: mut Evm) {
+    let target = deploy(owner: evm.address())
+    let owner: Address = evm
+        .call(
+            addr: target,
+            gas: 100000,
+            value: Wei::zero(),
+            message: TreasuryMsg::Owner {},
+        )
+    assert!(owner == evm.address())
+    assert!(next_id(target) == 1)
+    let expiry = evm.timestamp() + seconds(1000)
+    let first = create(
+        target,
+        delegate: Address::new(2),
+        recipient: Address::new(3),
+        cap: wei(25),
+        expiry,
+    )
+    let second = create(
+        target,
+        delegate: Address::new(4),
+        recipient: Address::new(5),
+        cap: wei(!(0 as u256)),
+        expiry,
+    )
+    assert!(first == 1 && second == 2 && next_id(target) == 3)
+    evm.call(
+        addr: target,
+        gas: 300000,
+        value: Wei::zero(),
+        message: TreasuryMsg::Revoke { grantId: first },
+    )
+    // Repeat is a no-op and must explicitly release the transient lock.
+    evm.call(
+        addr: target,
+        gas: 300000,
+        value: Wei::zero(),
+        message: TreasuryMsg::Revoke { grantId: first },
+    )
+    let third = create(
+        target,
+        delegate: Address::new(6),
+        recipient: Address::new(7),
+        cap: wei(30),
+        expiry,
+    )
+    assert!(third == 3 && next_id(target) == 4)
+    let one = observe(target, id: first)
+    let two = observe(target, id: second)
+    let three = observe(target, id: third)
+    assert!(
+        one.exists
+            && !one.active
+            && one.delegate == Address::new(2)
+            && one.recipient == Address::new(3),
+    )
+    assert!(
+        one.cap == wei(25) && one.spent == Wei::zero() && one.expires_at == expiry,
+    )
+    assert!(
+        two.exists
+            && two.active
+            && two.delegate == Address::new(4)
+            && two.recipient == Address::new(5),
+    )
+    assert!(
+        two.cap == wei(!(0 as u256)) && two.spent == Wei::zero() && two.expires_at == expiry,
+    )
+    assert!(
+        three.exists
+            && three.active
+            && three.delegate == Address::new(6)
+            && three.recipient == Address::new(7),
+    )
+    assert!(
+        three.cap == wei(30) && three.spent == Wei::zero() && three.expires_at == expiry,
+    )
+}
+
+#[test]
+fn absent_storage_never_becomes_a_policy_authorization() uses (evm: mut Evm) {
+    let target = deploy(owner: evm.address())
+    let ids = [0, 1, 999, !(0 as u256)]
+    for id in ids {
+        let grant = observe(target, id)
+        assert!(!grant.exists && !grant.active)
+        assert!(
+            grant.delegate == Address::zero() && grant.recipient == Address::zero(),
+        )
+        assert!(grant.cap == Wei::zero() && grant.spent == Wei::zero())
+        assert!(grant.expires_at == Timestamp::from_seconds(0))
+        let context = PolicyContext::new(
+            caller: Address::zero(),
+            now: Timestamp::from_seconds(0),
+            available: wei(100),
+        )
+        with (context) {
+            match evaluate_spend(id: GrantId::from_word(id), grant, amount: wei(1)) {
+                Err(PolicyError::UnknownGrant) => {},
+                _ => assert!(false),
+            }
+        }
+    }
+    assert!(next_id(target) == 1)
+}
+
+#[test]
+fn invalid_creation_has_exact_errors_and_no_id_consumption()
+uses (evm: mut Evm)
+{
+    let target = deploy(owner: evm.address())
+    let expiry = evm.timestamp() + seconds(1000)
+    let bad_delegate = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TreasuryMsg::CreateGrant {
+                delegate: Address::zero(),
+                recipient: Address::new(3),
+                cap: wei(25),
+                expiresAt: expiry,
+            },
+        )
+    assert!(
+        !bad_delegate.success() && is_error<InvalidAddress>(bad_delegate.returndata()),
+    )
+    let bad_recipient = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TreasuryMsg::CreateGrant {
+                delegate: Address::new(2),
+                recipient: Address::zero(),
+                cap: wei(25),
+                expiresAt: expiry,
+            },
+        )
+    assert!(
+        !bad_recipient.success() && is_error<InvalidAddress>(bad_recipient.returndata()),
+    )
+    let bad_cap = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TreasuryMsg::CreateGrant {
+                delegate: Address::new(2),
+                recipient: Address::new(3),
+                cap: Wei::zero(),
+                expiresAt: expiry,
+            },
+        )
+    assert!(
+        !bad_cap.success() && is_error<InvalidAmount>(bad_cap.returndata()),
+    )
+    let bad_expiry = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TreasuryMsg::CreateGrant {
+                delegate: Address::new(2),
+                recipient: Address::new(3),
+                cap: wei(25),
+                expiresAt: evm.timestamp(),
+            },
+        )
+    assert!(
+        !bad_expiry.success() && is_error<InvalidExpiry>(bad_expiry.returndata()),
+    )
+    assert!(next_id(target) == 1 && !observe(target, id: 1).exists)
+    assert!(
+        create(
+                target,
+                delegate: Address::new(2),
+                recipient: Address::new(3),
+                cap: wei(25),
+                expiry,
+            )
+            == 1,
+    )
+}
+
+#[test]
+fn unknown_revoke_encodes_id_and_restores_lock() uses (evm: mut Evm) {
+    let target = deploy(owner: evm.address())
+    let outcome = evm
+        .try_call(
+            addr: target,
+            gas: 300000,
+            value: Wei::zero(),
+            message: TreasuryMsg::Revoke { grantId: 999 },
+        )
+    assert!(!outcome.success())
+    let expected = encode_error(UnknownGrant { grantId: 999 })
+    assert!(
+        Bytes::from_payload(source: outcome.returndata())
+            == Bytes::from_payload(source: expected.span()),
+    )
+    assert!(next_id(target) == 1)
+    let expiry = evm.timestamp() + seconds(1000)
+    assert!(
+        create(
+                target,
+                delegate: Address::new(2),
+                recipient: Address::new(3),
+                cap: wei(25),
+                expiry,
+            )
+            == 1,
+    )
+}
+
+msg ActorMsg {
+    #[selector = sol("create(address,uint256)")]
+    Create { target: Address, expiry: Timestamp } -> u256,
+    #[selector = sol("revoke(address,uint256)")]
+    Revoke { target: Address, id: u256 },
+}
+
+pub contract Actor uses (call: mut Call) {
+    recv ActorMsg {
+        Create { target, expiry } -> u256 uses (mut call) {
+            call.call(
+                addr: target,
+                gas: 500000,
+                value: Wei::zero(),
+                message: TreasuryMsg::CreateGrant {
+                    delegate: Address::new(2),
+                    recipient: Address::new(3),
+                    cap: wei(25),
+                    expiresAt: expiry,
+                },
+            )
+        }
+        Revoke { target, id } uses (mut call) {
+            call.call(
+                addr: target,
+                gas: 300000,
+                value: Wei::zero(),
+                message: TreasuryMsg::Revoke { grantId: id },
+            )
+        }
+    }
+}
+
+#[test]
+fn actual_caller_authority_including_contract_owner() uses (evm: mut Evm) {
+    let actor = evm.create2<Actor>(value: Wei::zero(), args: (), salt: 2)
+    let target = deploy(owner: actor)
+    let expiry = evm.timestamp() + seconds(1000)
+    let direct_create = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TreasuryMsg::CreateGrant {
+                delegate: Address::new(2),
+                recipient: Address::new(3),
+                cap: wei(25),
+                expiresAt: expiry,
+            },
+        )
+    assert!(
+        !direct_create.success() && is_error<Unauthorized>(direct_create.returndata()),
+    )
+    let id: u256 = evm
+        .call(
+            addr: actor,
+            gas: 700000,
+            value: Wei::zero(),
+            message: ActorMsg::Create { target, expiry },
+        )
+    assert!(id == 1)
+    let direct_revoke = evm
+        .try_call(
+            addr: target,
+            gas: 300000,
+            value: Wei::zero(),
+            message: TreasuryMsg::Revoke { grantId: 1 },
+        )
+    assert!(
+        !direct_revoke.success() && is_error<Unauthorized>(direct_revoke.returndata()),
+    )
+    assert!(observe(target, id: 1).active)
+    evm.call(
+        addr: actor,
+        gas: 500000,
+        value: Wei::zero(),
+        message: ActorMsg::Revoke { target, id: 1 },
+    )
+    assert!(!observe(target, id: 1).active && next_id(target) == 2)
+}
+
+#[test(should_revert, selector = 0x49e27cff)]
+fn zero_owner_constructor_has_exact_error() uses (evm: mut Evm) {
+    let _ = deploy(owner: Address::zero())
+}

@@ -90,8 +90,9 @@ generated consumer's manifest; no compiler upgrade or policy change was used.
 The spec and [target ABI](../spec/treasury-v0.abi.json) are frozen design inputs.
 They are not claimed to be emitted by a treasury implementation yet. Policy
 categories map to the exact errors/payloads in [treasury-v0.md](../spec/treasury-v0.md).
-Actual storage existence, ID allocation, ABI decoding, runtime context binding,
-event emission, and protected execution remain EVM adapter obligations for
-Phases 2 and 3. Phase 0 proves the payment primitive separately; it does not
+The [Phase 2 administrative adapter](phase2.md) now implements storage existence,
+ID allocation, administration context binding, and its ABI/events. Deposit,
+spending context, payment composition, and callback behavior remain Phase 3
+obligations. Phase 0 proves the payment primitive separately; it does not
 prove the full composition. Reusable consumer and adversarial coverage remain
 later plan gates.

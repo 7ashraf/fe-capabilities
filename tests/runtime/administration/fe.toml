@@ -1,0 +1,7 @@
+[ingot]
+name = "administration_tests"
+version = "0.1.0"
+
+[dependencies]
+treasury = { path = "../../../treasury" }
+capabilities = { path = "../../../policy" }

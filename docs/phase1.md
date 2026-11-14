@@ -2,7 +2,8 @@
 
 Status: completed locally on 14 November 2026 with Fe 26.5.0 at commit
 `3dab95f8eebdccf9a2382bb59a33f7bbd03540ca`. This is a pure policy milestone;
-the grant treasury is not deployed or integrated yet.
+the grant treasury was not deployed or integrated at this milestone.
+Phase 2 subsequently completed; see [administration results](phase2.md).
 
 ## Deliverables
 

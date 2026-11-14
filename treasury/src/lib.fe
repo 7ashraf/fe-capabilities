@@ -1,0 +1,202 @@
+use capabilities::{
+    Grant,
+    GrantId,
+    GrantRequest,
+    PolicyContext,
+    PolicyError,
+    validate_owner,
+    evaluate_create,
+    evaluate_revoke,
+}
+use std::abi::sol
+use std::evm::{Address, Wei, Timestamp, Ctx, Log, Mutex, StorageMap}
+
+pub msg TreasuryMsg {
+    #[selector = sol("createGrant(address,address,uint256,uint256)")]
+    CreateGrant { delegate: Address, recipient: Address, cap: Wei, expiresAt: Timestamp } -> u256,
+    #[selector = sol("revoke(uint256)")]
+    Revoke { grantId: u256 },
+    #[selector = sol("owner()")]
+    Owner -> Address,
+    #[selector = sol("nextGrantId()")]
+    NextGrantId -> u256,
+    #[selector = sol("treasuryBalance()")]
+    TreasuryBalance -> Wei,
+    #[selector = sol("getGrant(uint256)")]
+    GetGrant { grantId: u256 } -> (bool, Address, Address, Wei, Wei, Timestamp, bool),
+}
+
+#[error]
+pub struct InvalidOwner {}
+#[error]
+pub struct Unauthorized {}
+#[error]
+pub struct InvalidAddress {}
+#[error]
+pub struct InvalidAmount {}
+#[error]
+pub struct InvalidExpiry {}
+#[error]
+pub struct GrantIdExhausted {}
+#[error]
+pub struct UnknownGrant { pub grantId: u256 }
+#[error]
+pub struct InvalidGrantState {}
+#[error]
+pub struct Reentrant {}
+#[error]
+pub struct UnsupportedCall {}
+
+#[event]
+pub struct GrantCreated {
+    #[indexed]
+    pub grantId: u256,
+    #[indexed]
+    pub delegate: Address,
+    #[indexed]
+    pub recipient: Address,
+    pub cap: Wei,
+    pub expiresAt: Timestamp,
+}
+
+#[event]
+pub struct GrantRevoked {
+    #[indexed]
+    pub grantId: u256,
+}
+
+// Private persistent state. Only the EVM boundary binds it to pure decisions.
+struct TreasuryStore { next_id: u256, grants: StorageMap<u256, Grant> }
+
+fn reject_admin(error: PolicyError, grant_id: u256) -> ! {
+    match error {
+        PolicyError::InvalidOwner => revert_error(InvalidOwner {}),
+        PolicyError::Unauthorized => revert_error(Unauthorized {}),
+        PolicyError::InvalidAddress => revert_error(InvalidAddress {}),
+        PolicyError::InvalidAmount => revert_error(InvalidAmount {}),
+        PolicyError::InvalidExpiry => revert_error(InvalidExpiry {}),
+        PolicyError::GrantIdExhausted => revert_error(GrantIdExhausted {}),
+        PolicyError::UnknownGrant => revert_error(UnknownGrant { grantId: grant_id }),
+        // A spend-only error cannot be produced by the administration evaluators.
+        _ => revert_error(InvalidGrantState {}),
+    }
+}
+
+// Phase 2 administrative subset. Deposit/spend are deliberately not dispatched.
+pub contract Treasury uses (ctx: Ctx, log: mut Log) {
+    owner: Address,
+    mut state: Mutex<TreasuryStore>,
+
+    init(initial_owner: Address)
+    uses (mut owner, mut state)
+    {
+        match validate_owner(owner: initial_owner) {
+            Ok(_) => {},
+            Err(error) => reject_admin(error: error, grant_id: 0),
+        }
+        owner = initial_owner
+        state.value().next_id = 1
+    }
+
+    recv {
+        TreasuryMsg::CreateGrant { delegate, recipient, cap, expiresAt } -> u256
+        uses (ctx, mut log, owner, mut state)
+        {
+            if !state.try_lock() {
+                revert_error(Reentrant {})
+            }
+            let context = PolicyContext::new(
+                caller: ctx.caller(),
+                now: ctx.timestamp(),
+                available: ctx.selfbalance(),
+            )
+            let next_id = GrantId::from_word(state.value().next_id)
+            let request = GrantRequest { delegate, recipient, cap, expires_at: expiresAt }
+            let result = with (context) {
+                evaluate_create(owner, next_id, request)
+            }
+            match result {
+                Err(error) => reject_admin(error: error, grant_id: 0),
+                Ok(decision) => {
+                    let id = decision.id.word()
+                    state.value().grants.set(key: id, value: decision.grant)
+                    state.value().next_id = decision.next_id.word()
+                    log.emit(
+                        GrantCreated { grantId: id, delegate, recipient, cap, expiresAt },
+                    )
+                    state.unlock()
+                    id
+                },
+            }
+        }
+
+        TreasuryMsg::Revoke { grantId } uses (ctx, mut log, owner, mut state) {
+            if !state.try_lock() {
+                revert_error(Reentrant {})
+            }
+            let context = PolicyContext::new(
+                caller: ctx.caller(),
+                now: ctx.timestamp(),
+                available: ctx.selfbalance(),
+            )
+            var grant = state.value().grants.get(key: grantId)
+            let result = with (context) {
+                evaluate_revoke(
+                    owner: owner,
+                    id: GrantId::from_word(grantId),
+                    grant: grant,
+                )
+            }
+            match result {
+                Err(error) => reject_admin(error: error, grant_id: grantId),
+                Ok(changed) => {
+                    if changed {
+                        grant.active = false
+                        state.value().grants.set(key: grantId, value: grant)
+                        log.emit(GrantRevoked { grantId })
+                    }
+                },
+            }
+            state.unlock()
+        }
+
+        TreasuryMsg::Owner -> Address uses (owner) {
+            owner
+        }
+        TreasuryMsg::NextGrantId -> u256 uses (state) {
+            state.value().next_id
+        }
+        TreasuryMsg::TreasuryBalance -> Wei uses (ctx) {
+            ctx.selfbalance()
+        }
+        TreasuryMsg::GetGrant { grantId } -> (bool, Address, Address, Wei, Wei, Timestamp, bool)
+        uses (state)
+        {
+            let grant = state.value().grants.get(key: grantId)
+            if grantId == 0 || grantId == !(0 as u256) || !grant.exists {
+                return (
+                    false,
+                    Address::zero(),
+                    Address::zero(),
+                    Wei::zero(),
+                    Wei::zero(),
+                    Timestamp::from_seconds(0),
+                    false,
+                )
+            }
+            (
+                true,
+                grant.delegate,
+                grant.recipient,
+                grant.cap,
+                grant.spent,
+                grant.expires_at,
+                grant.active,
+            )
+        }
+
+        _ {
+            revert_error(UnsupportedCall {})
+        }
+    }
+}

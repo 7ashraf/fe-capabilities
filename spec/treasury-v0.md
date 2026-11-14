@@ -1,9 +1,9 @@
 # Treasury v0 contract
 
 Status: **frozen implementation target, revision 1, 14 November 2026**.
-The pure policy is implemented and tested. The storage contract, event emission,
-and full EVM ABI below are future Phase 2/3 work; `spike/PaymentProbe` is not this
-interface. Any semantic change must revise this spec, its target ABI, and vectors.
+The pure policy and the Phase 2 administrative subset are implemented and
+tested; see [administration results](../docs/phase2.md). Deposit, spending, and
+the full EVM ABI remain Phase 3 work. `spike/PaymentProbe` is separate evidence. Any semantic change must revise this spec, its target ABI, and vectors.
 
 [treasury-v0.abi.json](treasury-v0.abi.json) is the machine-readable target ABI.
 All quantities are unsigned 256-bit values. Amounts are integer wei, times are
@@ -179,7 +179,8 @@ freeze both expected success values and error precedence, including maximal
 quantities. The test generator only renders literals and assertions into Fe;
 it contains no second implementation of policy decisions.
 
-Storage layout is not frozen by this ABI. Phase 2 must implement persistent
-administration and compare its emitted ABI/events with this target. Phase 3
+Storage layout is not frozen by this ABI. Phase 2 implements persistent
+administration and compares its emitted ABI/events with the corresponding
+subset of this target. Phase 3
 must integrate spending, payment failure, and hostile callback tests. The
 Phase 0 spike remains separate feasibility evidence throughout.
