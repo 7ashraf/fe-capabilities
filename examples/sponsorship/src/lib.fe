@@ -1,0 +1,210 @@
+use capabilities::{
+    Grant,
+    GrantId,
+    GrantRequest,
+    PolicyContext,
+    PolicyError,
+    evaluate_create,
+    evaluate_revoke,
+    evaluate_spend,
+}
+use std::evm::{Address, Wei, Timestamp, Ctx, Call, Log, Mutex}
+
+pub msg SponsorshipMsg {
+    #[selector = sol("fund()")]
+    Fund,
+    #[selector = sol("sponsor(uint256)")]
+    Sponsor { amount: Wei },
+    #[selector = sol("cancel()")]
+    Cancel,
+    #[selector = sol("campaignSponsor()")]
+    CampaignSponsor -> Address,
+    #[selector = sol("status()")]
+    Status -> (bool, Address, Address, Wei, Wei, Timestamp, bool),
+}
+
+#[error]
+pub struct PolicyRejected { pub code: u256 }
+#[error]
+pub struct PaymentFailed {}
+#[error]
+pub struct Reentrant {}
+#[error]
+pub struct UnsupportedCall {}
+
+#[event]
+pub struct Funded {
+    #[indexed]
+    pub sender: Address,
+    pub amount: Wei,
+}
+#[event]
+pub struct Sponsored {
+    #[indexed]
+    pub operator: Address,
+    #[indexed]
+    pub beneficiary: Address,
+    pub amount: Wei,
+    pub newSpent: Wei,
+}
+#[event]
+pub struct Cancelled {}
+
+// Translate categories only. All domain decisions and budget math remain imported.
+fn reject(error: PolicyError) -> ! {
+    let code: u256 = match error {
+        PolicyError::InvalidOwner => 1,
+        PolicyError::Unauthorized => 2,
+        PolicyError::UnknownGrant => 3,
+        PolicyError::InactiveGrant => 4,
+        PolicyError::InvalidAddress => 5,
+        PolicyError::InvalidAmount => 6,
+        PolicyError::InvalidExpiry => 7,
+        PolicyError::GrantIdExhausted => 8,
+        PolicyError::Expired => 9,
+        PolicyError::InvalidGrantState => 10,
+        PolicyError::CapExceeded => 11,
+        PolicyError::InsufficientBalance => 12,
+    }
+    revert_error(PolicyRejected { code })
+}
+
+// Single-campaign example, independent of the treasury implementation/ABI/store.
+pub contract Sponsorship uses (ctx: Ctx, call: mut Call, log: mut Log) {
+    sponsor: Address,
+    mut campaign: Mutex<Grant>,
+
+    init(operator: Address, beneficiary: Address, limit: Wei, expiresAt: Timestamp)
+    uses (ctx, mut sponsor, mut campaign)
+    {
+        let creator = ctx.caller()
+        let context = PolicyContext::new(
+            caller: creator,
+            now: ctx.timestamp(),
+            available: ctx.selfbalance(),
+        )
+        let request = GrantRequest {
+            delegate: operator,
+            recipient: beneficiary,
+            cap: limit,
+            expires_at: expiresAt,
+        }
+        let result = with (context) {
+            evaluate_create(
+                owner: creator,
+                next_id: GrantId::from_word(1),
+                request: request,
+            )
+        }
+        match result {
+            Err(error) => reject(error),
+            Ok(decision) => {
+                sponsor = creator
+                campaign.value() = decision.grant
+            },
+        }
+    }
+
+    recv {
+        #[payable]
+        SponsorshipMsg::Fund uses (ctx, mut log, mut campaign) {
+            if !campaign.try_lock() {
+                revert_error(Reentrant {})
+            }
+            let amount = ctx.value()
+            if amount != Wei::zero() {
+                log.emit(Funded { sender: ctx.caller(), amount })
+            }
+            campaign.unlock()
+        }
+
+        SponsorshipMsg::Sponsor { amount } uses (ctx, mut call, mut log, mut campaign) {
+            if !campaign.try_lock() {
+                revert_error(Reentrant {})
+            }
+            let context = PolicyContext::new(
+                caller: ctx.caller(),
+                now: ctx.timestamp(),
+                available: ctx.selfbalance(),
+            )
+            var grant = campaign.peek()
+            let result = with (context) {
+                evaluate_spend(id: GrantId::from_word(1), grant: grant, amount: amount)
+            }
+            match result {
+                Err(error) => reject(error),
+                Ok(decision) => {
+                    grant.spent = decision.new_spent
+                    campaign.value() = grant
+                    let outcome = call
+                        .send_value(
+                            addr: decision.recipient,
+                            gas: 100000,
+                            value: decision.amount,
+                        )
+                    if !outcome.success() {
+                        revert_error(PaymentFailed {})
+                    }
+                    log.emit(
+                        Sponsored {
+                            operator: context.caller,
+                            beneficiary: decision.recipient,
+                            amount: decision.amount,
+                            newSpent: decision.new_spent,
+                        },
+                    )
+                },
+            }
+            campaign.unlock()
+        }
+
+        SponsorshipMsg::Cancel uses (ctx, mut log, sponsor, mut campaign) {
+            if !campaign.try_lock() {
+                revert_error(Reentrant {})
+            }
+            let context = PolicyContext::new(
+                caller: ctx.caller(),
+                now: ctx.timestamp(),
+                available: ctx.selfbalance(),
+            )
+            var grant = campaign.peek()
+            let result = with (context) {
+                evaluate_revoke(owner: sponsor, id: GrantId::from_word(1), grant: grant)
+            }
+            match result {
+                Err(error) => reject(error),
+                Ok(changed) => {
+                    if changed {
+                        grant.active = false
+                        campaign.value() = grant
+                        log.emit(Cancelled {})
+                    }
+                },
+            }
+            campaign.unlock()
+        }
+
+        SponsorshipMsg::CampaignSponsor -> Address
+        uses (sponsor)
+        {
+            sponsor
+        }
+        SponsorshipMsg::Status -> (bool, Address, Address, Wei, Wei, Timestamp, bool)
+        uses (campaign)
+        {
+            let grant = campaign.peek()
+            (
+                grant.exists,
+                grant.delegate,
+                grant.recipient,
+                grant.cap,
+                grant.spent,
+                grant.expires_at,
+                grant.active,
+            )
+        }
+        _ {
+            revert_error(UnsupportedCall {})
+        }
+    }
+}

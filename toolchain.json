@@ -36,7 +36,7 @@
   },
   "evm_fork": "osaka",
   "solidity_version": null,
-  "status": "Phases 0–3 verified on 2026-11-14; Phase 4 pending.",
+  "status": "Phases 0–4 verified on 2026-11-14; Phase 5 pending.",
   "execution": {
     "backend": "sonatina",
     "optimization": "1",
@@ -65,8 +65,28 @@
         "capabilities": "../policy"
       },
       "revision": "same repository commit"
+    },
+    "capabilities_sponsorship": {
+      "path": "examples/sponsorship",
+      "dependencies": {
+        "capabilities": "../../policy"
+      },
+      "revision": "same repository commit"
     }
   },
   "administration_evidence_schema_version": 1,
-  "spending_evidence_schema_version": 1
+  "spending_evidence_schema_version": 1,
+  "policy_package": {
+    "name": "capabilities_policy",
+    "version": "0.1.0",
+    "source_introduced_at": "6a4fa0629d9432eb522b49f6cb121cd7e820a7d6",
+    "source_sha256": {
+      "fe.toml": "7362f48804e22c52f5f7ea79737ed08e378f7faf1b9c7d92e35387ee7628908f",
+      "src/lib.fe": "ef2c9b2a24b78080b59705bccc2d94cf25ecf8ed9c8558c0a92ee19e98acc6f9",
+      "src/policy.fe": "97695eb46b585df2322b8f8203eb679c1479e477b6499e67f19da9dd9ffab1f0",
+      "src/types.fe": "f0e6fae2aa8bde5c281b9d4918d2bde3bc46c726a4673cfda769cc1a6519a3a7"
+    }
+  },
+  "boundary_evidence_schema_version": 1,
+  "sponsorship_evidence_schema_version": 1
 }

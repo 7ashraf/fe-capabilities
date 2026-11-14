@@ -1,0 +1,6 @@
+[ingot]
+name = "sponsorship_tests"
+version = "0.1.0"
+
+[dependencies]
+sponsorship = { path = "../../../examples/sponsorship" }

@@ -1,0 +1,37 @@
+use capabilities::{Grant, GrantId, PolicyContext, evaluate_spend}
+use std::evm::{Address, Wei, Timestamp, Call, wei}
+
+fn pay(recipient: Address, amount: Wei) uses (payment: mut Call) {
+    assert!(
+        payment.send_value(addr: recipient, gas: 100000, value: amount).success(),
+    )
+}
+
+fn consumer(grant: Grant) uses (context: PolicyContext) {
+    match evaluate_spend(id: GrantId::from_word(1), grant: grant, amount: wei(7)) {
+        Err(_) => assert!(false),
+        Ok(decision) => pay(recipient: decision.recipient, amount: decision.amount),
+    }
+}
+
+#[test(balance = 100)]
+fn declared_payment_access() uses (evm: mut Evm, payment: mut Call) {
+    let grant = Grant {
+        exists: true,
+        delegate: Address::new(2),
+        recipient: Address::new(0xbeef),
+        cap: wei(25),
+        spent: wei(9),
+        expires_at: Timestamp::from_seconds(200),
+        active: true,
+    }
+    let context = PolicyContext::new(
+        caller: Address::new(2),
+        now: Timestamp::from_seconds(100),
+        available: wei(100),
+    )
+    with (context) {
+        consumer(grant)
+    }
+    assert!(evm.balance(Address::new(0xbeef)) == wei(7))
+}

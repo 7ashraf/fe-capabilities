@@ -1,0 +1,295 @@
+use sponsorship::{Sponsorship, SponsorshipMsg, PolicyRejected, PaymentFailed}
+use std::evm::{Address, Wei, Timestamp, Call, encode_error, seconds, wei}
+
+pub msg ReceiverMsg {
+    #[selector = sol("reject(bool)")]
+    Reject { enabled: bool },
+}
+#[error]
+pub struct RecipientRejected {}
+
+pub contract Receiver {
+    mut rejecting: bool,
+    recv {
+        ReceiverMsg::Reject { enabled } uses (mut rejecting) {
+            rejecting = enabled
+        }
+        #[payable]
+        _ uses (rejecting) {
+            if rejecting {
+                revert_error(RecipientRejected {})
+            }
+        }
+    }
+}
+
+msg ProxyMsg {
+    #[selector = sol("pay(address,uint256)")]
+    Pay { target: Address, amount: Wei },
+    #[selector = sol("cancel(address)")]
+    Cancel { target: Address },
+}
+
+pub contract Proxy uses (call: mut Call) {
+    recv ProxyMsg {
+        Pay { target, amount } uses (mut call) {
+            call.call(
+                addr: target,
+                gas: 500000,
+                value: Wei::zero(),
+                message: SponsorshipMsg::Sponsor { amount },
+            )
+        }
+        Cancel { target } uses (mut call) {
+            call.call(
+                addr: target,
+                gas: 300000,
+                value: Wei::zero(),
+                message: SponsorshipMsg::Cancel {},
+            )
+        }
+    }
+}
+
+fn deploy(operator: Address, beneficiary: Address, salt: u256) -> Address
+uses (evm: mut Evm)
+{
+    evm.create2<Sponsorship>(
+        value: Wei::zero(),
+        args: (operator, beneficiary, wei(25), evm.timestamp() + seconds(1000)),
+        salt,
+    )
+}
+
+fn spent(target: Address) -> Wei uses (evm: mut Evm) {
+    let (exists, _, _, cap, value, _, active): (
+        bool,
+        Address,
+        Address,
+        Wei,
+        Wei,
+        Timestamp,
+        bool,
+    ) = evm.call(
+            addr: target,
+            gas: 100000,
+            value: Wei::zero(),
+            message: SponsorshipMsg::Status {},
+        )
+    assert!(exists && cap == wei(25))
+    value
+}
+
+fn fund(target: Address) uses (evm: mut Evm) {
+    evm.call(
+        addr: target,
+        gas: 200000,
+        value: wei(100),
+        message: SponsorshipMsg::Fund {},
+    )
+}
+
+fn pay(target: Address, amount: Wei) uses (evm: mut Evm) {
+    evm.call(
+        addr: target,
+        gas: 500000,
+        value: Wei::zero(),
+        message: SponsorshipMsg::Sponsor { amount },
+    )
+}
+
+#[test(balance = 1000)]
+fn second_consumer_pays_twice_and_isolates_campaigns() uses (evm: mut Evm) {
+    let first = deploy(
+        operator: evm.address(),
+        beneficiary: Address::new(0xbeef),
+        salt: 1,
+    )
+    let second = deploy(
+        operator: evm.address(),
+        beneficiary: Address::new(0xcafe),
+        salt: 2,
+    )
+    let creator: Address = evm
+        .call(
+            addr: first,
+            gas: 100000,
+            value: Wei::zero(),
+            message: SponsorshipMsg::CampaignSponsor {},
+        )
+    assert!(creator == evm.address())
+    fund(target: first)
+    pay(target: first, amount: wei(5))
+    pay(target: first, amount: wei(5))
+    assert!(
+        spent(target: first) == wei(10) && spent(target: second) == Wei::zero(),
+    )
+    assert!(
+        evm.balance(first) == wei(90) && evm.balance(Address::new(0xbeef)) == wei(10),
+    )
+    assert!(
+        evm.balance(second) == Wei::zero() && evm.balance(Address::new(0xcafe)) == Wei::zero(),
+    )
+}
+
+#[test(balance = 1000)]
+fn policy_errors_are_reused_without_local_rule_copies() uses (evm: mut Evm) {
+    let target = deploy(
+        operator: evm.address(),
+        beneficiary: Address::new(0xbeef),
+        salt: 1,
+    )
+    let insufficient = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: SponsorshipMsg::Sponsor { amount: wei(7) },
+        )
+    let expected = encode_error(PolicyRejected { code: 12 })
+    assert!(
+        !insufficient.success()
+            && Bytes::from_payload(source: insufficient.returndata())
+                == Bytes::from_payload(source: expected.span()),
+    )
+    fund(target)
+    let empty = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: SponsorshipMsg::Sponsor { amount: Wei::zero() },
+        )
+    let expected = encode_error(PolicyRejected { code: 6 })
+    assert!(
+        !empty.success()
+            && Bytes::from_payload(source: empty.returndata())
+                == Bytes::from_payload(source: expected.span()),
+    )
+    let excessive = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: SponsorshipMsg::Sponsor { amount: wei(26) },
+        )
+    let expected = encode_error(PolicyRejected { code: 11 })
+    assert!(
+        !excessive.success()
+            && Bytes::from_payload(source: excessive.returndata())
+                == Bytes::from_payload(source: expected.span()),
+    )
+    assert!(spent(target) == Wei::zero())
+    pay(target, amount: wei(25))
+    assert!(spent(target) == wei(25))
+}
+
+#[test(balance = 1000)]
+fn actual_operator_and_sponsor_authority_are_independent() uses (evm: mut Evm) {
+    let proxy = evm.create2<Proxy>(value: Wei::zero(), args: (), salt: 2)
+    let target = deploy(
+        operator: proxy,
+        beneficiary: Address::new(0xbeef),
+        salt: 1,
+    )
+    fund(target)
+    let denied = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: SponsorshipMsg::Sponsor { amount: wei(7) },
+        )
+    let expected = encode_error(PolicyRejected { code: 2 })
+    assert!(
+        !denied.success()
+            && Bytes::from_payload(source: denied.returndata())
+                == Bytes::from_payload(source: expected.span()),
+    )
+    evm.call(
+        addr: proxy,
+        gas: 700000,
+        value: Wei::zero(),
+        message: ProxyMsg::Pay { target, amount: wei(7) },
+    )
+    assert!(spent(target) == wei(7))
+    let denied_cancel = evm
+        .try_call(
+            addr: proxy,
+            gas: 500000,
+            value: Wei::zero(),
+            message: ProxyMsg::Cancel { target },
+        )
+    assert!(
+        !denied_cancel.success()
+            && Bytes::from_payload(source: denied_cancel.returndata())
+                == Bytes::from_payload(source: expected.span()),
+    )
+    evm.call(
+        addr: target,
+        gas: 300000,
+        value: Wei::zero(),
+        message: SponsorshipMsg::Cancel {},
+    )
+    evm.call(
+        addr: target,
+        gas: 300000,
+        value: Wei::zero(),
+        message: SponsorshipMsg::Cancel {},
+    )
+    let inactive = evm
+        .try_call(
+            addr: proxy,
+            gas: 700000,
+            value: Wei::zero(),
+            message: ProxyMsg::Pay { target, amount: wei(1) },
+        )
+    let expected = encode_error(PolicyRejected { code: 4 })
+    assert!(
+        !inactive.success()
+            && Bytes::from_payload(source: inactive.returndata())
+                == Bytes::from_payload(source: expected.span()),
+    )
+    assert!(spent(target) == wei(7))
+}
+
+#[test(balance = 1000)]
+fn rejected_beneficiary_rolls_back_then_recovers_same_transaction()
+uses (evm: mut Evm)
+{
+    let receiver = evm.create2<Receiver>(value: Wei::zero(), args: (), salt: 2)
+    let target = deploy(operator: evm.address(), beneficiary: receiver, salt: 1)
+    fund(target)
+    evm.call(
+        addr: receiver,
+        gas: 100000,
+        value: Wei::zero(),
+        message: ReceiverMsg::Reject { enabled: true },
+    )
+    let failed = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: SponsorshipMsg::Sponsor { amount: wei(7) },
+        )
+    let expected = encode_error(PaymentFailed {})
+    assert!(
+        !failed.success()
+            && Bytes::from_payload(source: failed.returndata())
+                == Bytes::from_payload(source: expected.span()),
+    )
+    assert!(
+        spent(target) == Wei::zero()
+            && evm.balance(target) == wei(100)
+            && evm.balance(receiver) == Wei::zero(),
+    )
+    evm.call(
+        addr: receiver,
+        gas: 100000,
+        value: Wei::zero(),
+        message: ReceiverMsg::Reject { enabled: false },
+    )
+    pay(target, amount: wei(7))
+    assert!(spent(target) == wei(7) && evm.balance(receiver) == wei(7))
+}

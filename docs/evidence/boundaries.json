@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "compiler": "fe 26.5.0 (3dab95f)",
+  "cases": [
+    {
+      "name": "payment",
+      "positive_test": "passed",
+      "negative_exit": 1,
+      "diagnostic": "error[8-0036]: missing effect `Call` required by `pay`\n   \u250c\u2500 src/lib.fe:13:25\n   \u2502\n13 \u2502         Ok(decision) => pay(recipient: decision.recipient, amount: decision.amount),\n   \u2502                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `pay` requires effect `Call` to be in scope\n   \u2502\n   = require it in this function's signature with `uses (payment: mut Call)`, so that its callers provide it\n   = or provide it to a block of this function with `with (Call = value) { .. }`\n\n",
+      "positive_sha256": "4cac2c6454d100fb838fe273ad15a3911d886ebbbdbf3a7cee3643055d9b6c1a",
+      "negative_sha256": "a0a8b5435ae3958279c5b0ddde08e07a9ffecad5aa1c3d63ae6cc91374e99291"
+    },
+    {
+      "name": "store",
+      "positive_test": "passed",
+      "negative_exit": 1,
+      "diagnostic": "error[8-0036]: missing effect `StorageMap<u256, Grant>` required by `persist`\n   \u250c\u2500 src/lib.fe:14:13\n   \u2502\n14 \u2502             persist(grant: updated)\n   \u2502             ^^^^^^^^^^^^^^^^^^^^^^^ `persist` requires effect `StorageMap<u256, Grant>` to be in scope\n   \u2502\n   = require it in this function's signature with `uses (store: mut StorageMap<u256, Grant>)`, so that its callers provide it\n   = or provide it to a block of this function with `with (StorageMap<u256, Grant> = value) { .. }`\n\n",
+      "positive_sha256": "546147d289595752424cac1eb7ee4318169c72572ca8b35d0e2bbc45af3644d5",
+      "negative_sha256": "c632929be426c89ee78201b7910ccd8f6d9d3825ff08cce621e3840428dba97d"
+    },
+    {
+      "name": "grant_write",
+      "positive_test": "passed",
+      "negative_exit": 1,
+      "diagnostic": "error[8-0018]: left-hand side of assignment is immutable\n  \u250c\u2500 src/lib.fe:5:5\n  \u2502\n4 \u2502 fn clear_spent() uses (grant: Grant) {\n  \u2502                        ------------ write `mut grant` in `uses` to write it\n5 \u2502     grant.spent = Wei::zero()\n  \u2502     ^^^^^^^^^^^ immutable assignment\n\n",
+      "positive_sha256": "3faf171833a54f6018b9f9a1c4ba63c4af7299c6eea3c9084a94a697100960a3",
+      "negative_sha256": "9e4a28a26adf1738f632933555773c9d658505f4d249bf1267c6eae0ab83484f"
+    }
+  ]
+}

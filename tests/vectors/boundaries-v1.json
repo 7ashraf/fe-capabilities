@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "payment",
+      "positive": "tests/compile_fail/payment_allowed",
+      "negative": "tests/compile_fail/payment_rejected",
+      "category": "8-0036",
+      "substring": "missing effect `Call` required by `pay`",
+      "allowed_declaration": "consumer(grant:Grant)uses(context:PolicyContext,payment:mutCall)",
+      "rejected_declaration": "consumer(grant:Grant)uses(context:PolicyContext)"
+    },
+    {
+      "name": "store",
+      "positive": "tests/compile_fail/store_allowed",
+      "negative": "tests/compile_fail/store_rejected",
+      "category": "8-0036",
+      "substring": "missing effect `StorageMap<u256, Grant>` required by `persist`",
+      "allowed_declaration": "consumer(grant:Grant)uses(context:PolicyContext,store:mutStorageMap<u256,Grant>)",
+      "rejected_declaration": "consumer(grant:Grant)uses(context:PolicyContext)"
+    },
+    {
+      "name": "grant_write",
+      "positive": "tests/compile_fail/grant_write_allowed",
+      "negative": "tests/compile_fail/grant_write_rejected",
+      "category": "8-0018",
+      "substring": "left-hand side of assignment is immutable",
+      "allowed_declaration": "clear_spent()uses(grant:mutGrant)",
+      "rejected_declaration": "clear_spent()uses(grant:Grant)"
+    }
+  ]
+}

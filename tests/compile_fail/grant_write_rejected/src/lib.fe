@@ -1,0 +1,23 @@
+use capabilities::Grant
+use std::evm::{Address, Wei, Timestamp, wei}
+
+fn clear_spent() uses (grant: Grant) {
+    grant.spent = Wei::zero()
+}
+
+#[test]
+fn explicit_grant_write_access() {
+    var grant = Grant {
+        exists: true,
+        delegate: Address::new(2),
+        recipient: Address::new(0xbeef),
+        cap: wei(25),
+        spent: wei(9),
+        expires_at: Timestamp::from_seconds(200),
+        active: true,
+    }
+    with (mut grant) {
+        clear_spent()
+    }
+    assert!(grant.spent == Wei::zero())
+}

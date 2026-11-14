@@ -1,0 +1,61 @@
+use capabilities::{Grant, GrantId, PolicyContext, evaluate_spend}
+use std::evm::{Address, Wei, Timestamp, StorageMap, wei}
+
+fn persist(grant: Grant) uses (store: mut StorageMap<u256, Grant>) {
+    store.set(key: 1, value: grant)
+}
+
+fn consumer(grant: Grant) uses (context: PolicyContext) {
+    match evaluate_spend(id: GrantId::from_word(1), grant: grant, amount: wei(7)) {
+        Err(_) => assert!(false),
+        Ok(decision) => {
+            var updated = grant
+            updated.spent = decision.new_spent
+            persist(grant: updated)
+        },
+    }
+}
+
+msg FixtureMsg {
+    #[selector = sol("update()")]
+    Update -> Wei,
+}
+
+pub contract Fixture {
+    mut store: StorageMap<u256, Grant>,
+    recv FixtureMsg {
+        Update -> Wei uses (mut store) {
+            let grant = Grant {
+                exists: true,
+                delegate: Address::new(2),
+                recipient: Address::new(0xbeef),
+                cap: wei(25),
+                spent: wei(9),
+                expires_at: Timestamp::from_seconds(200),
+                active: true,
+            }
+            let context = PolicyContext::new(
+                caller: Address::new(2),
+                now: Timestamp::from_seconds(100),
+                available: wei(100),
+            )
+            with (context, mut store) {
+                consumer(grant)
+            }
+            store.get(key: 1).spent
+        }
+    }
+}
+
+#[test]
+fn declared_store_access() uses (evm: mut Evm) {
+    let target = evm.create2<Fixture>(value: Wei::zero(), args: (), salt: 1)
+    let spent: Wei = evm
+        .call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: FixtureMsg::Update {},
+        )
+    assert!(spent == wei(16))
+}

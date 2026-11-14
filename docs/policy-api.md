@@ -92,7 +92,7 @@ The full treasury ABI is now emitted and compared against this target. Policy
 categories map to the exact errors/payloads in [treasury-v0.md](../spec/treasury-v0.md).
 The [Phase 3 EVM adapter](phase3.md) now implements storage existence, ID
 allocation, current context binding, the full ABI/events, payment composition,
-and the documented callback behavior. Broader reuse and external boundary
-proofs remain Phase 4 work. Phase 0 proves the payment primitive separately; it does not
+and the documented callback behavior. The [Phase 4 reuse checks](phase4.md) now verify a second independent consumer
+and three external access-boundary pairs. Phase 0 proves the payment primitive separately; it does not
 prove the full composition. Reusable consumer and adversarial coverage remain
 later plan gates.
