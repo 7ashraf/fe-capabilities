@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "compiler": "fe 26.5.0 (3dab95f)",
+  "compiler_sha256": "4968711c5bc02c1a3151cfaea0d81a48dc74803ea208362022af467c2a523fed",
+  "backend": "sonatina",
+  "optimization": "1",
+  "source_sha256": {
+    "policy/src/policy.fe": "97695eb46b585df2322b8f8203eb679c1479e477b6499e67f19da9dd9ffab1f0",
+    "treasury/src/lib.fe": "5acc23870070e8226627297ab523c80b0030a30f4fad3d836ff057f67dcbef21"
+  },
+  "test_inputs_sha256": {
+    "tests/vectors/policy-v1.json": "60e625428d0cfe05defb1566ebd54246f3e9c94327d70c8b7169f02837f12dd2",
+    "tests/vectors/mutations-v1.json": "cc763c5e71cf877c1abb43c1b54050d4af56b6b5628bcb7c344218fad4e9bf91",
+    "scripts/verify-policy.py": "1342c2d824b3ced5100bad4a9b5e7f959d74d7783ae6e41fd9358fc780c4d0b9",
+    "scripts/verify-mutations.py": "be59636821a79c1bc99b9fbc47d9bd196ddf937106998cc63bbb738fa1a65e11",
+    "tests/runtime/spending/src/lib.fe": "c5bf37f4a10d075246094fe27066d5c90345c108e0e983bc27d1316c802fc7b2"
+  },
+  "cases": [
+    {
+      "name": "remove_cap_check",
+      "test": "one_over_remaining",
+      "detected": true,
+      "file": "policy/src/policy.fe",
+      "test_sha256": "b59de4da78e9eee03c8f7a545f323266c5bb99c0d7245f2f43dace9d9712663d",
+      "baseline_sha256": "97695eb46b585df2322b8f8203eb679c1479e477b6499e67f19da9dd9ffab1f0",
+      "mutant_sha256": "9768dccd2a598da469a6b52054da7521f56dfdb3500aab0d71964c7ee239bc42",
+      "patch": "--- baseline/policy/src/policy.fe\n+++ mutant/policy/src/policy.fe\n@@ -112,9 +112,7 @@\n         return Err(PolicyError::InvalidGrantState)\n     }\n     let remaining = grant.cap - grant.spent\n-    if amount > remaining {\n-        return Err(PolicyError::CapExceeded)\n-    }\n+    // Seeded defect: cap validation removed.\n     if amount > context.available {\n         return Err(PolicyError::InsufficientBalance)\n     }\n",
+      "baseline_check": {
+        "command": [
+          "fe",
+          "check",
+          ".tools/mutation-vectors"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "baseline_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          ".tools/mutation-vectors",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "one_over_remaining"
+        ],
+        "exit": 0,
+        "output": "PASS  [0.0002s] one_over_remaining\n\ntest result: ok. 1 passed; 0 failed\n"
+      },
+      "mutant_check": {
+        "command": [
+          "fe",
+          "check",
+          ".tools/mutation-vectors"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "mutant_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          ".tools/mutation-vectors",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "one_over_remaining"
+        ],
+        "exit": 1,
+        "output": "FAIL  [0.0001s] one_over_remaining\n    Test reverted: 0x4e487b710000000000000000000000000000000000000000000000000000000000000001\n\ntest result: FAILED. 0 passed; 1 failed\n\nfailures:\n    one_over_remaining\n"
+      }
+    },
+    {
+      "name": "allow_expiry_equality",
+      "test": "expiry_equal_now",
+      "detected": true,
+      "file": "policy/src/policy.fe",
+      "test_sha256": "50cdf306428766722bba942759cd85c7856031dc830d0884c532c4eea1f63540",
+      "baseline_sha256": "97695eb46b585df2322b8f8203eb679c1479e477b6499e67f19da9dd9ffab1f0",
+      "mutant_sha256": "4747305fd86a9fa6307637e8d66b104592160b990a4e12fc2cf5720c0cf516ae",
+      "patch": "--- baseline/policy/src/policy.fe\n+++ mutant/policy/src/policy.fe\n@@ -102,7 +102,7 @@\n     if amount == Wei::zero() {\n         return Err(PolicyError::InvalidAmount)\n     }\n-    if context.now >= grant.expires_at {\n+    if context.now > grant.expires_at {\n         return Err(PolicyError::Expired)\n     }\n     if grant.delegate == Address::zero()\n",
+      "baseline_check": {
+        "command": [
+          "fe",
+          "check",
+          ".tools/mutation-vectors"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "baseline_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          ".tools/mutation-vectors",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "expiry_equal_now"
+        ],
+        "exit": 0,
+        "output": "PASS  [0.0001s] expiry_equal_now\n\ntest result: ok. 1 passed; 0 failed\n"
+      },
+      "mutant_check": {
+        "command": [
+          "fe",
+          "check",
+          ".tools/mutation-vectors"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "mutant_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          ".tools/mutation-vectors",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "expiry_equal_now"
+        ],
+        "exit": 1,
+        "output": "FAIL  [0.0001s] expiry_equal_now\n    Test reverted: 0x4e487b710000000000000000000000000000000000000000000000000000000000000001\n\ntest result: FAILED. 0 passed; 1 failed\n\nfailures:\n    expiry_equal_now\n"
+      }
+    },
+    {
+      "name": "remove_delegate_check",
+      "test": "wrong_caller",
+      "detected": true,
+      "file": "policy/src/policy.fe",
+      "test_sha256": "7303baeedbf24b3e3d3d4718b283f647d18db71e94b271e915c643bdeb3cdf0e",
+      "baseline_sha256": "97695eb46b585df2322b8f8203eb679c1479e477b6499e67f19da9dd9ffab1f0",
+      "mutant_sha256": "f750f31333916a2aab1bf204602050a0f1452482990f581f6f76c0b1f130c9ff",
+      "patch": "--- baseline/policy/src/policy.fe\n+++ mutant/policy/src/policy.fe\n@@ -93,9 +93,7 @@\n     if id.word() == 0 || id.word() == !(0 as u256) || !grant.exists {\n         return Err(PolicyError::UnknownGrant)\n     }\n-    if context.caller != grant.delegate {\n-        return Err(PolicyError::Unauthorized)\n-    }\n+    // Seeded defect: delegate validation removed.\n     if !grant.active {\n         return Err(PolicyError::InactiveGrant)\n     }\n",
+      "baseline_check": {
+        "command": [
+          "fe",
+          "check",
+          ".tools/mutation-vectors"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "baseline_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          ".tools/mutation-vectors",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "wrong_caller"
+        ],
+        "exit": 0,
+        "output": "PASS  [0.0001s] wrong_caller\n\ntest result: ok. 1 passed; 0 failed\n"
+      },
+      "mutant_check": {
+        "command": [
+          "fe",
+          "check",
+          ".tools/mutation-vectors"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "mutant_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          ".tools/mutation-vectors",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "wrong_caller"
+        ],
+        "exit": 1,
+        "output": "FAIL  [0.0001s] wrong_caller\n    Test reverted: 0x4e487b710000000000000000000000000000000000000000000000000000000000000001\n\ntest result: FAILED. 0 passed; 1 failed\n\nfailures:\n    wrong_caller\n"
+      }
+    },
+    {
+      "name": "forget_spend_unlock",
+      "test": "two_same_transaction_spends_transfer_and_account_once_each",
+      "detected": true,
+      "file": "treasury/src/lib.fe",
+      "test_sha256": "c5bf37f4a10d075246094fe27066d5c90345c108e0e983bc27d1316c802fc7b2",
+      "baseline_sha256": "5acc23870070e8226627297ab523c80b0030a30f4fad3d836ff057f67dcbef21",
+      "mutant_sha256": "d4d4b554bd24743da95610a1910880268728c00b16ce526893cb525e8544babb",
+      "patch": "--- baseline/treasury/src/lib.fe\n+++ mutant/treasury/src/lib.fe\n@@ -219,7 +219,7 @@\n                             newSpent: decision.new_spent,\n                         },\n                     )\n-                    state.unlock()\n+                    // Seeded defect: successful spend forgets to unlock.\n                 },\n             }\n         }\n",
+      "baseline_check": {
+        "command": [
+          "fe",
+          "check",
+          "tests/runtime/spending"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "baseline_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          "tests/runtime/spending",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "two_same_transaction_spends_transfer_and_account_once_each"
+        ],
+        "exit": 0,
+        "output": "PASS  [0.0002s] two_same_transaction_spends_transfer_and_account_once_each\n\ntest result: ok. 1 passed; 0 failed\n"
+      },
+      "mutant_check": {
+        "command": [
+          "fe",
+          "check",
+          "tests/runtime/spending"
+        ],
+        "exit": 0,
+        "output": ""
+      },
+      "mutant_test": {
+        "command": [
+          "fe",
+          "test",
+          "--color",
+          "never",
+          "tests/runtime/spending",
+          "--backend",
+          "sonatina",
+          "-O",
+          "1",
+          "--filter",
+          "two_same_transaction_spends_transfer_and_account_once_each"
+        ],
+        "exit": 1,
+        "output": "FAIL  [0.0002s] two_same_transaction_spends_transfer_and_account_once_each\n    Test reverted: 0xed3ba6a6\n\ntest result: FAILED. 0 passed; 1 failed\n\nfailures:\n    two_same_transaction_spends_transfer_and_account_once_each\n"
+      }
+    }
+  ],
+  "detected": 4,
+  "survived": 0
+}

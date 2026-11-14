@@ -501,3 +501,60 @@ fn uncaught_callback_failure_rolls_back_outer_payment() uses (evm: mut Evm) {
         evm.balance(target) == wei(100) && evm.balance(recipient) == Wei::zero(),
     )
 }
+
+#[test(balance = 1000)]
+fn shared_lock_blocks_reentry_into_another_authorized_grant()
+uses (evm: mut Evm)
+{
+    let (target, recipient) = setup(mode: 2)
+    let expiry = evm.timestamp() + seconds(1000)
+    let second: u256 = evm
+        .call(
+            addr: recipient,
+            gas: 700000,
+            value: Wei::zero(),
+            message: ControllerMsg::Create { target, cap: wei(25), expiry },
+        )
+    assert!(second == 2)
+    // Execute grant 1, but make the recipient's nested spend target grant 2.
+    evm.call(
+        addr: recipient,
+        gas: 200000,
+        value: Wei::zero(),
+        message: ControllerMsg::Configure { target, id: second, mode: 2 },
+    )
+    fund(target)
+    execute(target, recipient, amount: wei(7), twice: false)
+    let (checked, callbacks, _, _): (bool, u256, Wei, Wei) = evm
+        .call(
+            addr: recipient,
+            gas: 100000,
+            value: Wei::zero(),
+            message: ControllerMsg::Stats {},
+        )
+    assert!(checked && callbacks == 1 && spent(target) == wei(7))
+    let (exists, delegate, to, cap, second_spent, expires_at, active): (
+        bool,
+        Address,
+        Address,
+        Wei,
+        Wei,
+        Timestamp,
+        bool,
+    ) = evm
+        .call(
+            addr: target,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TreasuryMsg::GetGrant { grantId: second },
+        )
+    assert!(
+        exists && active && delegate == recipient && to == recipient,
+    )
+    assert!(
+        cap == wei(25) && second_spent == Wei::zero() && expires_at == expiry,
+    )
+    assert!(
+        evm.balance(target) == wei(93) && evm.balance(recipient) == wei(7),
+    )
+}

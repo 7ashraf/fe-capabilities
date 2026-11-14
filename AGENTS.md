@@ -5,8 +5,10 @@ existing history when adding a remote and pushing.
 
 Read `docs/reference/FE_AGENT_REFERENCE.md` and
 `docs/reference/FE_CAPABILITIES_PLAN.md` before implementation. Work on the first incomplete
-phase and its exit gate; Phases 0–4 are complete (see `docs/feasibility.md` and
-`docs/phase1.md` through `docs/phase4.md`); Phase 5 is next.
+phase and its exit gate; Phases 0–4 are complete. Phase 5 technical work is verified; independent
+developer feedback remains pending (see `docs/phase5.md` and
+`docs/reviewer-feedback.md`). Do not claim outside review or start Phase 6
+until actual feedback is recorded or the owner explicitly waives that task.
 
 Use Fe 26.5.0 at commit `3dab95f8eebdccf9a2382bb59a33f7bbd03540ca`.
 From this repository root, run `python3 scripts/bootstrap-fe.py` when needed,

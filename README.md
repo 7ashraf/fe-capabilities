@@ -7,13 +7,16 @@ explicit boundary vectors on both EVM and native backends. Persistent grant
 administration, deposits, and delegate spending now run together on the EVM,
 with payment rollback and hostile callback checks. An independent sponsorship
 consumer now uses the identical policy inputs, with external access proofs.
+Phase 5 technical review and all four seeded-defect checks pass; independent
+developer feedback is still pending.
 
 The [treasury specification](spec/treasury-v0.md) and
 [target ABI](spec/treasury-v0.abi.json) are implemented by the treasury.
 Read [the policy API](docs/policy-api.md), [Phase 1 results](docs/phase1.md),
 [Phase 2 administration results](docs/phase2.md), and
 [Phase 3 spending results](docs/phase3.md), and
-[Phase 4 reuse results](docs/phase4.md).
+[Phase 4 reuse results](docs/phase4.md). Current review evidence and outstanding
+feedback are tracked in [Phase 5](docs/phase5.md).
 
 ## Run checks
 
@@ -25,22 +28,18 @@ From this repository root:
 ```sh
 python3 scripts/bootstrap-fe.py
 source scripts/env.sh
-python3 scripts/verify-reuse.py
-python3 scripts/verify-policy.py
-python3 scripts/verify-phase0.py
+python3 scripts/demo.py
+python3 scripts/verify-review.py
 ```
 
 If the pinned compiler is already installed, set `FE_BIN` to its absolute path
 instead of downloading again. The runner verifies its binary digest and version.
-The reuse runner checks both consumers and their compiler policy inputs, runs
-three new compile-fail pairs and positive controls, and includes the spending
-runner. The spending runner includes administration checks and validates the full ABI,
-real transfers, exact events/errors, rollback, and hostile callbacks.
-The policy runner executes 70 explicit vectors on each backend and rejects timestamps passed as payment
-amounts. The Phase 0 runner executes reference
-examples, budget and payment tests, expected compilation failure, release build,
-and a fresh local Anvil Osaka chain. It stops that chain
-after checking real transaction receipts, balances, accounting, and error bytes.
+The demo prints asserted results for an allowed payment, three rejected actions,
+blocked reentry, and a later valid batch. The review runner includes both
+consumers, metadata/source identity, external access pairs, pure policy vectors,
+all previous regressions, four isolated compiling mutants, and focused mined-
+expiry/cross-grant checks. Its technical success does not claim outside review.
+The temporary local Anvil chains are stopped after use.
 
 | Demonstrated boundary | Evidence |
 | --- | --- |
@@ -68,16 +67,17 @@ not copied. See [package usage](policy/README.md) and
 [the capability table](docs/capability-boundaries.md).
 
 The trusted boundary assembles capabilities and checks runtime authority. This
-does not sandbox hostile trusted code. Independent adversarial review, seeded-defect detection, and a security audit
-remain incomplete. Callback tests cover the modes
+does not sandbox hostile trusted code. Independent developer feedback and any professional security audit remain
+incomplete. The internal matrix, threat notes, and selected mutation sensitivity
+results are recorded without a general absence-of-vulnerabilities claim. Callback tests cover the modes
 listed in Phase 3 results; they are not a proof against every hostile program.
 No application unsafe code was introduced. The pinned stdlib supplies EVM internals.
 
 Read [the feasibility evidence](docs/feasibility.md),
 [the implementation plan](docs/reference/FE_CAPABILITIES_PLAN.md), and
 [the language reference](docs/reference/FE_AGENT_REFERENCE.md).
-Next: Phase 5, review invariants, verify tests against seeded defects, prepare
-a reproducible demo, and collect independent developer feedback.
+Next: collect [independent developer feedback](docs/reviewer-feedback.md) to
+close Phase 5. Final freeze/license/handoff remains Phase 6.
 
 ## Repository and provenance
 

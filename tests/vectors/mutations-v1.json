@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "remove_cap_check",
+      "file": "policy/src/policy.fe",
+      "before": "    if amount > remaining {\n        return Err(PolicyError::CapExceeded)\n    }",
+      "after": "    // Seeded defect: cap validation removed.",
+      "kind": "policy",
+      "test": "one_over_remaining"
+    },
+    {
+      "name": "allow_expiry_equality",
+      "file": "policy/src/policy.fe",
+      "before": "    if context.now >= grant.expires_at {",
+      "after": "    if context.now > grant.expires_at {",
+      "kind": "policy",
+      "test": "expiry_equal_now"
+    },
+    {
+      "name": "remove_delegate_check",
+      "file": "policy/src/policy.fe",
+      "before": "    if context.caller != grant.delegate {\n        return Err(PolicyError::Unauthorized)\n    }",
+      "after": "    // Seeded defect: delegate validation removed.",
+      "kind": "policy",
+      "test": "wrong_caller"
+    },
+    {
+      "name": "forget_spend_unlock",
+      "file": "treasury/src/lib.fe",
+      "before": "                    state.unlock()\n                },\n            }\n        }\n\n        TreasuryMsg::CreateGrant",
+      "after": "                    // Seeded defect: successful spend forgets to unlock.\n                },\n            }\n        }\n\n        TreasuryMsg::CreateGrant",
+      "kind": "runtime",
+      "test": "two_same_transaction_spends_transfer_and_account_once_each"
+    }
+  ]
+}

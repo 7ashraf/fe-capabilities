@@ -36,7 +36,7 @@
   },
   "evm_fork": "osaka",
   "solidity_version": null,
-  "status": "Phases 0–4 verified on 2026-11-14; Phase 5 pending.",
+  "status": "Phases 0–4 complete; Phase 5 technical checks verified on 2026-11-14; independent developer feedback pending.",
   "execution": {
     "backend": "sonatina",
     "optimization": "1",
@@ -88,5 +88,8 @@
     }
   },
   "boundary_evidence_schema_version": 1,
-  "sponsorship_evidence_schema_version": 1
+  "sponsorship_evidence_schema_version": 1,
+  "mutation_evidence_schema_version": 1,
+  "review_evidence_schema_version": 1,
+  "demo_evidence_schema_version": 1
 }
