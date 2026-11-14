@@ -7,11 +7,16 @@ use capabilities::{
     validate_owner,
     evaluate_create,
     evaluate_revoke,
+    evaluate_spend,
 }
 use std::abi::sol
-use std::evm::{Address, Wei, Timestamp, Ctx, Log, Mutex, StorageMap}
+use std::evm::{Address, Wei, Timestamp, Ctx, Call, Log, Mutex, StorageMap}
 
 pub msg TreasuryMsg {
+    #[selector = sol("deposit()")]
+    Deposit,
+    #[selector = sol("spend(uint256,uint256)")]
+    Spend { grantId: u256, amount: Wei },
     #[selector = sol("createGrant(address,address,uint256,uint256)")]
     CreateGrant { delegate: Address, recipient: Address, cap: Wei, expiresAt: Timestamp } -> u256,
     #[selector = sol("revoke(uint256)")]
@@ -46,6 +51,36 @@ pub struct InvalidGrantState {}
 pub struct Reentrant {}
 #[error]
 pub struct UnsupportedCall {}
+
+#[error]
+pub struct InactiveGrant { pub grantId: u256 }
+#[error]
+pub struct Expired { pub expiresAt: Timestamp, pub currentTime: Timestamp }
+#[error]
+pub struct CapExceeded { pub remaining: Wei, pub requested: Wei }
+#[error]
+pub struct InsufficientBalance { pub available: Wei, pub requested: Wei }
+#[error]
+pub struct PaymentFailed {}
+
+#[event]
+pub struct Deposited {
+    #[indexed]
+    pub sender: Address,
+    pub amount: Wei,
+}
+
+#[event]
+pub struct Spent {
+    #[indexed]
+    pub grantId: u256,
+    #[indexed]
+    pub delegate: Address,
+    #[indexed]
+    pub recipient: Address,
+    pub amount: Wei,
+    pub newSpent: Wei,
+}
 
 #[event]
 pub struct GrantCreated {
@@ -82,8 +117,33 @@ fn reject_admin(error: PolicyError, grant_id: u256) -> ! {
     }
 }
 
-// Phase 2 administrative subset. Deposit/spend are deliberately not dispatched.
-pub contract Treasury uses (ctx: Ctx, log: mut Log) {
+fn reject_spend(
+    error: PolicyError,
+    grant_id: u256,
+    grant: Grant,
+    amount: Wei,
+    context: PolicyContext,
+) -> ! {
+    match error {
+        PolicyError::UnknownGrant => revert_error(UnknownGrant { grantId: grant_id }),
+        PolicyError::Unauthorized => revert_error(Unauthorized {}),
+        PolicyError::InactiveGrant => revert_error(InactiveGrant { grantId: grant_id }),
+        PolicyError::InvalidAmount => revert_error(InvalidAmount {}),
+        PolicyError::Expired => revert_error(
+            Expired { expiresAt: grant.expires_at, currentTime: context.now },
+        ),
+        PolicyError::InvalidGrantState => revert_error(InvalidGrantState {}),
+        PolicyError::CapExceeded => revert_error(
+            CapExceeded { remaining: grant.cap - grant.spent, requested: amount },
+        ),
+        PolicyError::InsufficientBalance => revert_error(
+            InsufficientBalance { available: context.available, requested: amount },
+        ),
+        _ => revert_error(InvalidGrantState {}),
+    }
+}
+
+pub contract Treasury uses (ctx: Ctx, call: mut Call, log: mut Log) {
     owner: Address,
     mut state: Mutex<TreasuryStore>,
 
@@ -99,6 +159,71 @@ pub contract Treasury uses (ctx: Ctx, log: mut Log) {
     }
 
     recv {
+        #[payable]
+        TreasuryMsg::Deposit uses (ctx, mut log, mut state) {
+            if !state.try_lock() {
+                revert_error(Reentrant {})
+            }
+            let amount = ctx.value()
+            if amount != Wei::zero() {
+                log.emit(Deposited { sender: ctx.caller(), amount })
+            }
+            state.unlock()
+        }
+
+        TreasuryMsg::Spend { grantId, amount } uses (ctx, mut call, mut log, mut state) {
+            if !state.try_lock() {
+                revert_error(Reentrant {})
+            }
+            let context = PolicyContext::new(
+                caller: ctx.caller(),
+                now: ctx.timestamp(),
+                available: ctx.selfbalance(),
+            )
+            var grant = state.value().grants.get(key: grantId)
+            let result = with (context) {
+                evaluate_spend(
+                    id: GrantId::from_word(grantId),
+                    grant: grant,
+                    amount: amount,
+                )
+            }
+            match result {
+                Err(error) => reject_spend(
+                    error: error,
+                    grant_id: grantId,
+                    grant: grant,
+                    amount: amount,
+                    context: context,
+                ),
+                Ok(decision) => {
+                    // Reserve against the current snapshot before the external call.
+                    grant.spent = decision.new_spent
+                    state.value().grants.set(key: grantId, value: grant)
+                    // No mutable storage projection is held across this payment.
+                    let outcome = call
+                        .send_value(
+                            addr: decision.recipient,
+                            gas: 100000,
+                            value: decision.amount,
+                        )
+                    if !outcome.success() {
+                        revert_error(PaymentFailed {})
+                    }
+                    log.emit(
+                        Spent {
+                            grantId,
+                            delegate: context.caller,
+                            recipient: decision.recipient,
+                            amount: decision.amount,
+                            newSpent: decision.new_spent,
+                        },
+                    )
+                    state.unlock()
+                },
+            }
+        }
+
         TreasuryMsg::CreateGrant { delegate, recipient, cap, expiresAt } -> u256
         uses (ctx, mut log, owner, mut state)
         {

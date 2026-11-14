@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Phase 2 contract, administrative ABI subset, and actual transactions."""
+"""Verify persistent administration within the full treasury ABI."""
 import argparse
 import hashlib
 import json
@@ -39,10 +39,12 @@ def check_abi():
                 entry['type'] == 'event' and entry['name'] in EVENTS or
                 entry['type'] == 'error' and entry['name'] in ERRORS]
     assert len(expected) == 20, 'Unexpected phase coverage fixture'
-    assert normalized(actual) == normalized(expected), 'Emitted ABI differs from the frozen administrative subset'
+    assert normalized(actual) == normalized(frozen), 'Emitted ABI differs from the frozen full treasury interface'
+    projection = [entry for entry in actual if (entry['type'], entry.get('name', '')) in normalized(expected)]
+    assert normalized(projection) == normalized(expected), 'Administrative ABI projection changed'
     snapshot = json.loads((ROOT / 'spec/treasury-admin-v1.abi.json').read_text())
-    assert actual == snapshot, 'Emitted ABI differs from the versioned Phase 2 snapshot'
-    print('PASS emitted ABI: 6 functions, 2 events, 10 errors, constructor and fallback', flush=True)
+    assert normalized(projection) == normalized(snapshot), 'Administrative ABI differs from the Phase 2 snapshot'
+    print('PASS full frozen ABI and unchanged Phase 2 administrative projection', flush=True)
 
 
 def main(record=None):
@@ -68,7 +70,7 @@ def main(record=None):
     if record:
         command.extend(['--record', str(record)])
     run(*command)
-    print('PASS Phase 2 administration verification', flush=True)
+    print('PASS administration regression verification', flush=True)
 
 
 if __name__ == '__main__':

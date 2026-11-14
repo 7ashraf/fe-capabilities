@@ -88,11 +88,11 @@ generated consumer's manifest; no compiler upgrade or policy change was used.
 ## Remaining boundaries
 
 The spec and [target ABI](../spec/treasury-v0.abi.json) are frozen design inputs.
-They are not claimed to be emitted by a treasury implementation yet. Policy
+The full treasury ABI is now emitted and compared against this target. Policy
 categories map to the exact errors/payloads in [treasury-v0.md](../spec/treasury-v0.md).
-The [Phase 2 administrative adapter](phase2.md) now implements storage existence,
-ID allocation, administration context binding, and its ABI/events. Deposit,
-spending context, payment composition, and callback behavior remain Phase 3
-obligations. Phase 0 proves the payment primitive separately; it does not
+The [Phase 3 EVM adapter](phase3.md) now implements storage existence, ID
+allocation, current context binding, the full ABI/events, payment composition,
+and the documented callback behavior. Broader reuse and external boundary
+proofs remain Phase 4 work. Phase 0 proves the payment primitive separately; it does not
 prove the full composition. Reusable consumer and adversarial coverage remain
 later plan gates.

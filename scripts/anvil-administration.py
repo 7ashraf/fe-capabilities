@@ -114,7 +114,7 @@ def run(record=None):
         create(3, delegate, recipient2, 30)
         assert grant(1) == first and grant(2) == second  # No revival or sibling corruption.
 
-        for data in ['0x', '0x01', '0xdeadbeef', calldata('deposit()'), calldata('spend(uint256,uint256)', 999, 1)]:
+        for data in ['0x', '0x01', '0xdeadbeef', calldata('withdraw(uint256)', 1), calldata('spend(uint256,uint256,uint256)', 999, 1, 1)]:
             reject('unsupported_' + data, data, 'UnsupportedCall()')
         for signature, args in [('owner()', []), ('nextGrantId()', []), ('treasuryBalance()', []),
                                 ('getGrant(uint256)', [1]), ('revoke(uint256)', [1]),

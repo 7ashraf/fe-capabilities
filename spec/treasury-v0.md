@@ -1,9 +1,10 @@
 # Treasury v0 contract
 
 Status: **frozen implementation target, revision 1, 14 November 2026**.
-The pure policy and the Phase 2 administrative subset are implemented and
-tested; see [administration results](../docs/phase2.md). Deposit, spending, and
-the full EVM ABI remain Phase 3 work. `spike/PaymentProbe` is separate evidence. Any semantic change must revise this spec, its target ABI, and vectors.
+The full EVM interface is implemented and tested; see
+[Phase 3 results](../docs/phase3.md). `spike/PaymentProbe` remains separate
+feasibility evidence. Any semantic change must revise this spec, its target ABI,
+and vectors.
 
 [treasury-v0.abi.json](treasury-v0.abi.json) is the machine-readable target ABI.
 All quantities are unsigned 256-bit values. Amounts are integer wei, times are
@@ -59,8 +60,8 @@ nonpayable function, fallback, or constructor is rejected before domain checks.
 Malformed calldata for a known selector must fail ABI decoding before domain
 checks. Dispatch, malformed ABI, and automatic nonpayable failures follow the
 pinned compiler's rejection encoding; no application custom error is promised
-for these compiler-generated failures. Their rejection and unchanged state must
-be verified when the EVM adapter is implemented.
+for these compiler-generated failures. Their rejection and unchanged state are
+checked by the administration and spending runners.
 
 ## Validation precedence
 
@@ -181,6 +182,6 @@ it contains no second implementation of policy decisions.
 
 Storage layout is not frozen by this ABI. Phase 2 implements persistent
 administration and compares its emitted ABI/events with the corresponding
-subset of this target. Phase 3
-must integrate spending, payment failure, and hostile callback tests. The
+subset of this target. Phase 3 integrates spending, payment failure, and
+hostile callback tests, and verifies the complete target ABI. The
 Phase 0 spike remains separate feasibility evidence throughout.

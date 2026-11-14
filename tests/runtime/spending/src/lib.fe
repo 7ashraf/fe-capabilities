@@ -1,0 +1,503 @@
+use treasury::{
+    Treasury,
+    TreasuryMsg,
+    Reentrant,
+    PaymentFailed,
+    Unauthorized,
+    UnknownGrant,
+    InactiveGrant,
+    InvalidAmount,
+    CapExceeded,
+    InsufficientBalance,
+}
+use std::evm::{
+    Address,
+    Wei,
+    Timestamp,
+    Ctx,
+    Call,
+    Log,
+    CallOutcome,
+    is_error,
+    encode_error,
+    seconds,
+    wei,
+}
+use core::ptr::MemSpan
+
+pub msg ControllerMsg {
+    #[selector = sol("configure(address,uint256,uint256)")]
+    Configure { target: Address, id: u256, mode: u256 },
+    #[selector = sol("create(address,uint256,uint256)")]
+    Create { target: Address, cap: Wei, expiry: Timestamp } -> u256,
+    #[selector = sol("execute(address,uint256,uint256,bool)")]
+    Execute { target: Address, id: u256, amount: Wei, twice: bool },
+    #[selector = sol("revoke(address,uint256)")]
+    Revoke { target: Address, id: u256 },
+    #[selector = sol("stats()")]
+    Stats -> (bool, u256, Wei, Wei),
+}
+
+#[error]
+pub struct RecipientRejected {}
+#[event]
+pub struct RecipientTouched {}
+
+struct CallbackStore {
+    target: Address,
+    id: u256,
+    mode: u256,
+    checked: bool,
+    callbacks: u256,
+    seen_spent: Wei,
+    seen_balance: Wei,
+}
+
+// Test fixture only: its controller intentionally has no user authorization.
+pub contract CallbackRecipient uses (ctx: Ctx, call: mut Call, log: mut Log) {
+    mut store: CallbackStore,
+    recv {
+        ControllerMsg::Configure { target, id, mode }
+        uses (mut store)
+        {
+            store.target = target
+            store.id = id
+            store.mode = mode
+        }
+        ControllerMsg::Create { target, cap, expiry } -> u256
+        uses (ctx, mut call)
+        {
+            call.call(
+                addr: target,
+                gas: 500000,
+                value: Wei::zero(),
+                message: TreasuryMsg::CreateGrant {
+                    delegate: ctx.address(),
+                    recipient: ctx.address(),
+                    cap,
+                    expiresAt: expiry,
+                },
+            )
+        }
+        ControllerMsg::Execute { target, id, amount, twice }
+        uses (mut call)
+        {
+            call.call(
+                addr: target,
+                gas: 500000,
+                value: Wei::zero(),
+                message: TreasuryMsg::Spend { grantId: id, amount },
+            )
+            if twice {
+                call.call(
+                    addr: target,
+                    gas: 500000,
+                    value: Wei::zero(),
+                    message: TreasuryMsg::Spend { grantId: id, amount },
+                )
+            }
+        }
+        ControllerMsg::Revoke { target, id } uses (mut call) {
+            call.call(
+                addr: target,
+                gas: 300000,
+                value: Wei::zero(),
+                message: TreasuryMsg::Revoke { grantId: id },
+            )
+        }
+        ControllerMsg::Stats -> (bool, u256, Wei, Wei)
+        uses (store)
+        {
+            (store.checked, store.callbacks, store.seen_spent, store.seen_balance)
+        }
+        #[payable]
+        _ uses (ctx, mut call, mut log, mut store) {
+            log.emit(RecipientTouched {})
+            let target = store.target
+            let id = store.id
+            let mode = store.mode
+            if mode == 1 {
+                revert_error(RecipientRejected {})
+            }
+            if mode == 2 {
+                let outcome = call
+                    .try_call(
+                        addr: target,
+                        gas: 25000,
+                        value: Wei::zero(),
+                        message: TreasuryMsg::Spend { grantId: id, amount: wei(1) },
+                    )
+                store.checked = !outcome.success() && is_error<Reentrant>(outcome.returndata())
+            } else if mode == 3 {
+                let outcome = call
+                    .try_call(
+                        addr: target,
+                        gas: 25000,
+                        value: Wei::zero(),
+                        message: TreasuryMsg::Revoke { grantId: id },
+                    )
+                store.checked = !outcome.success() && is_error<Reentrant>(outcome.returndata())
+            } else if mode == 4 {
+                let outcome = call
+                    .try_call(
+                        addr: target,
+                        gas: 25000,
+                        value: Wei::zero(),
+                        message: TreasuryMsg::CreateGrant {
+                            delegate: ctx.address(),
+                            recipient: ctx.address(),
+                            cap: wei(1),
+                            expiresAt: ctx.timestamp() + seconds(1000),
+                        },
+                    )
+                store.checked = !outcome.success() && is_error<Reentrant>(outcome.returndata())
+            } else if mode == 5 || mode == 6 {
+                let value = if mode == 6 { wei(1) } else { Wei::zero() }
+                let outcome = call
+                    .try_call(
+                        addr: target,
+                        gas: 25000,
+                        value,
+                        message: TreasuryMsg::Deposit {},
+                    )
+                store.checked = !outcome.success() && is_error<Reentrant>(outcome.returndata())
+            } else if mode == 8 {
+                // An uncaught callback error must roll back the entire outer payment.
+                call.call(
+                    addr: target,
+                    gas: 25000,
+                    value: Wei::zero(),
+                    message: TreasuryMsg::Revoke { grantId: id },
+                )
+            } else if mode == 7 {
+                let (_, _, _, _, spent, _, _): (
+                    bool,
+                    Address,
+                    Address,
+                    Wei,
+                    Wei,
+                    Timestamp,
+                    bool,
+                ) = call
+                    .call(
+                        addr: target,
+                        gas: 40000,
+                        value: Wei::zero(),
+                        message: TreasuryMsg::GetGrant { grantId: id },
+                    )
+                let balance: Wei = call
+                    .call(
+                        addr: target,
+                        gas: 10000,
+                        value: Wei::zero(),
+                        message: TreasuryMsg::TreasuryBalance {},
+                    )
+                store.seen_spent = spent
+                store.seen_balance = balance
+                store.checked = true
+            } else {
+                store.checked = true
+            }
+            store.callbacks += 1
+        }
+    }
+}
+
+fn setup(mode: u256) -> (Address, Address) uses (evm: mut Evm) {
+    let recipient = evm.create2<CallbackRecipient>(value: Wei::zero(), args: (), salt: 1)
+    let target = evm.create2<Treasury>(value: Wei::zero(), args: (recipient,), salt: 2)
+    let id: u256 = evm
+        .call(
+            addr: recipient,
+            gas: 700000,
+            value: Wei::zero(),
+            message: ControllerMsg::Create {
+                target,
+                cap: wei(25),
+                expiry: evm.timestamp() + seconds(1000),
+            },
+        )
+    assert!(id == 1)
+    evm.call(
+        addr: recipient,
+        gas: 200000,
+        value: Wei::zero(),
+        message: ControllerMsg::Configure { target, id, mode },
+    )
+    (target, recipient)
+}
+
+fn fund(target: Address) uses (evm: mut Evm) {
+    evm.call(
+        addr: target,
+        gas: 200000,
+        value: wei(100),
+        message: TreasuryMsg::Deposit {},
+    )
+}
+
+fn execute(target: Address, recipient: Address, amount: Wei, twice: bool)
+uses (evm: mut Evm)
+{
+    evm.call(
+        addr: recipient,
+        gas: 1500000,
+        value: Wei::zero(),
+        message: ControllerMsg::Execute { target, id: 1, amount, twice },
+    )
+}
+
+fn spent(target: Address) -> Wei uses (evm: mut Evm) {
+    let (exists, _, _, _, value, _, active): (
+        bool,
+        Address,
+        Address,
+        Wei,
+        Wei,
+        Timestamp,
+        bool,
+    ) = evm
+        .call(
+            addr: target,
+            gas: 200000,
+            value: Wei::zero(),
+            message: TreasuryMsg::GetGrant { grantId: 1 },
+        )
+    assert!(exists && active)
+    value
+}
+
+fn exact(outcome: CallOutcome, expected: MemSpan) {
+    assert!(!outcome.success())
+    assert!(
+        Bytes::from_payload(source: outcome.returndata()) == Bytes::from_payload(source: expected),
+    )
+}
+
+#[test(balance = 1000)]
+fn two_same_transaction_spends_transfer_and_account_once_each()
+uses (evm: mut Evm)
+{
+    let (target, recipient) = setup(mode: 0)
+    fund(target)
+    execute(target, recipient, amount: wei(5), twice: true)
+    assert!(spent(target) == wei(10))
+    assert!(
+        evm.balance(target) == wei(90) && evm.balance(recipient) == wei(10),
+    )
+    let (checked, callbacks, _, _): (bool, u256, Wei, Wei) = evm
+        .call(
+            addr: recipient,
+            gas: 100000,
+            value: Wei::zero(),
+            message: ControllerMsg::Stats {},
+        )
+    assert!(checked && callbacks == 2)
+}
+
+#[test(balance = 1000)]
+fn recipient_failure_rolls_back_and_later_same_transaction_spend_works()
+uses (evm: mut Evm)
+{
+    let (target, recipient) = setup(mode: 1)
+    fund(target)
+    let outcome = evm
+        .try_call(
+            addr: recipient,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ControllerMsg::Execute { target, id: 1, amount: wei(7), twice: false },
+        )
+    let expected = encode_error(PaymentFailed {})
+    exact(outcome, expected: expected.span())
+    assert!(spent(target) == Wei::zero())
+    assert!(
+        evm.balance(target) == wei(100) && evm.balance(recipient) == Wei::zero(),
+    )
+    let (_, callbacks, _, _): (bool, u256, Wei, Wei) = evm
+        .call(
+            addr: recipient,
+            gas: 100000,
+            value: Wei::zero(),
+            message: ControllerMsg::Stats {},
+        )
+    assert!(callbacks == 0)
+    evm.call(
+        addr: recipient,
+        gas: 200000,
+        value: Wei::zero(),
+        message: ControllerMsg::Configure { target, id: 1, mode: 0 },
+    )
+    execute(target, recipient, amount: wei(7), twice: false)
+    assert!(
+        spent(target) == wei(7) && evm.balance(recipient) == wei(7),
+    )
+}
+
+// Each test starts with a recipient that is the authorized owner AND delegate.
+fn callback_case(mode: u256) uses (evm: mut Evm) {
+    let (target, recipient) = setup(mode)
+    fund(target)
+    execute(target, recipient, amount: wei(7), twice: false)
+    let (checked, callbacks, _, _): (bool, u256, Wei, Wei) = evm
+        .call(
+            addr: recipient,
+            gas: 100000,
+            value: Wei::zero(),
+            message: ControllerMsg::Stats {},
+        )
+    assert!(checked && callbacks == 1)
+    assert!(spent(target) == wei(7))
+    assert!(
+        evm.balance(target) == wei(93) && evm.balance(recipient) == wei(7),
+    )
+    let next: u256 = evm
+        .call(
+            addr: target,
+            gas: 100000,
+            value: Wei::zero(),
+            message: TreasuryMsg::NextGrantId {},
+        )
+    assert!(next == 2)
+}
+
+#[test(balance = 1000)]
+fn same_function_reentry_is_reentrant_not_an_authority_error()
+uses (evm: mut Evm)
+{
+    callback_case(mode: 2)
+}
+#[test(balance = 1000)]
+fn contract_owner_cannot_revoke_in_callback() uses (evm: mut Evm) {
+    callback_case(mode: 3)
+}
+#[test(balance = 1000)]
+fn contract_owner_cannot_create_in_callback() uses (evm: mut Evm) {
+    callback_case(mode: 4)
+}
+#[test(balance = 1000)]
+fn zero_deposit_callback_is_guarded() uses (evm: mut Evm) {
+    callback_case(mode: 5)
+}
+#[test(balance = 1000)]
+fn positive_deposit_callback_rolls_back_value() uses (evm: mut Evm) {
+    callback_case(mode: 6)
+}
+
+#[test(balance = 1000)]
+fn callback_getter_observes_reserved_spent_and_post_transfer_balance()
+uses (evm: mut Evm)
+{
+    let (target, recipient) = setup(mode: 7)
+    fund(target)
+    execute(target, recipient, amount: wei(7), twice: false)
+    let (checked, callbacks, seen_spent, seen_balance): (bool, u256, Wei, Wei) = evm
+        .call(
+            addr: recipient,
+            gas: 100000,
+            value: Wei::zero(),
+            message: ControllerMsg::Stats {},
+        )
+    assert!(
+        checked && callbacks == 1 && seen_spent == wei(7) && seen_balance == wei(93),
+    )
+    assert!(spent(target) == wei(7))
+}
+
+#[test]
+fn funding_failure_has_exact_payload_and_preserves_spent() uses (evm: mut Evm) {
+    let (target, recipient) = setup(mode: 0)
+    let outcome = evm
+        .try_call(
+            addr: recipient,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ControllerMsg::Execute { target, id: 1, amount: wei(7), twice: false },
+        )
+    let expected = encode_error(
+        InsufficientBalance { available: Wei::zero(), requested: wei(7) },
+    )
+    exact(outcome, expected: expected.span())
+    assert!(spent(target) == Wei::zero())
+}
+
+#[test(balance = 1000)]
+fn runtime_policy_errors_have_exact_payloads() uses (evm: mut Evm) {
+    let (target, recipient) = setup(mode: 0)
+    fund(target)
+    let unauthorized = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TreasuryMsg::Spend { grantId: 1, amount: wei(7) },
+        )
+    let expected = encode_error(Unauthorized {})
+    exact(outcome: unauthorized, expected: expected.span())
+    let unknown = evm
+        .try_call(
+            addr: target,
+            gas: 500000,
+            value: Wei::zero(),
+            message: TreasuryMsg::Spend { grantId: 999, amount: Wei::zero() },
+        )
+    let expected = encode_error(UnknownGrant { grantId: 999 })
+    exact(outcome: unknown, expected: expected.span())
+    let zero = evm
+        .try_call(
+            addr: recipient,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ControllerMsg::Execute { target, id: 1, amount: Wei::zero(), twice: false },
+        )
+    let expected = encode_error(InvalidAmount {})
+    exact(outcome: zero, expected: expected.span())
+    let excessive = evm
+        .try_call(
+            addr: recipient,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ControllerMsg::Execute { target, id: 1, amount: wei(26), twice: false },
+        )
+    let expected = encode_error(CapExceeded { remaining: wei(25), requested: wei(26) })
+    exact(outcome: excessive, expected: expected.span())
+    assert!(spent(target) == Wei::zero())
+    execute(target, recipient, amount: wei(25), twice: false)
+    assert!(
+        spent(target) == wei(25) && evm.balance(recipient) == wei(25),
+    )
+    evm.call(
+        addr: recipient,
+        gas: 500000,
+        value: Wei::zero(),
+        message: ControllerMsg::Revoke { target, id: 1 },
+    )
+    let inactive = evm
+        .try_call(
+            addr: recipient,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ControllerMsg::Execute { target, id: 1, amount: wei(1), twice: false },
+        )
+    let expected = encode_error(InactiveGrant { grantId: 1 })
+    exact(outcome: inactive, expected: expected.span())
+}
+
+#[test(balance = 1000)]
+fn uncaught_callback_failure_rolls_back_outer_payment() uses (evm: mut Evm) {
+    let (target, recipient) = setup(mode: 8)
+    fund(target)
+    let outcome = evm
+        .try_call(
+            addr: recipient,
+            gas: 1000000,
+            value: Wei::zero(),
+            message: ControllerMsg::Execute { target, id: 1, amount: wei(7), twice: false },
+        )
+    let expected = encode_error(PaymentFailed {})
+    exact(outcome, expected: expected.span())
+    assert!(spent(target) == Wei::zero())
+    assert!(
+        evm.balance(target) == wei(100) && evm.balance(recipient) == Wei::zero(),
+    )
+}

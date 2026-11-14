@@ -1,6 +1,8 @@
 # Phase 2 — persistent storage and administration
 
 Status: completed locally on 14 November 2026 with pinned Fe 26.5.0.
+This is the historical Phase 2 record at commit `2dc30ad`; the full spending
+adapter subsequently completed in [Phase 3](phase3.md).
 `treasury/` is a deployable administrative contract using `policy/` as a relative
 local dependency. Its six functions implement the administrative subset of the
 frozen [treasury v0 specification](../spec/treasury-v0.md). Deposit and spend
@@ -38,7 +40,9 @@ The target ABI comparison checks types, ordered outputs, mutability, indexed
 fields, event anonymity, and error signatures. Argument/return labels are
 metadata and do not change canonical encoding: the constructor's emitted input
 is named `initial_owner` and tuple outputs are unnamed. The snapshot additionally
-records those exact emitted labels. No extra functions are accepted by the check.
+records those exact emitted labels. The current runner now validates the full
+frozen treasury ABI and projects its administrative entries against this
+historical snapshot, preserving the Phase 2 checks as deposit/spend are added.
 
 ## Storage boundary
 

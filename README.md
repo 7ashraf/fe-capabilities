@@ -1,15 +1,17 @@
 # Fe Capabilities
 
 Build reusable Fe policy components for limited ETH spending permissions, then
-validate their composition in a treasury. Phases 0–2 are complete: narrow
+validate their composition in a treasury. Phases 0–3 are complete: narrow
 access and real local payments are proven, and the pure grant policy passes
 explicit boundary vectors on both EVM and native backends. Persistent grant
-administration now runs on the EVM; deposit and spending integration are next.
+administration, deposits, and delegate spending now run together on the EVM,
+with payment rollback and hostile callback checks.
 
 The [treasury specification](spec/treasury-v0.md) and
-[target ABI](spec/treasury-v0.abi.json) are frozen implementation targets.
+[target ABI](spec/treasury-v0.abi.json) are implemented by the treasury.
 Read [the policy API](docs/policy-api.md), [Phase 1 results](docs/phase1.md),
-and [Phase 2 administration results](docs/phase2.md).
+[Phase 2 administration results](docs/phase2.md), and
+[Phase 3 spending results](docs/phase3.md).
 
 ## Run checks
 
@@ -21,16 +23,16 @@ From this repository root:
 ```sh
 python3 scripts/bootstrap-fe.py
 source scripts/env.sh
-python3 scripts/verify-administration.py
+python3 scripts/verify-spending.py
 python3 scripts/verify-policy.py
 python3 scripts/verify-phase0.py
 ```
 
 If the pinned compiler is already installed, set `FE_BIN` to its absolute path
 instead of downloading again. The runner verifies its binary digest and version.
-The administration runner checks the deployed grant store, exact ABI/events,
-authorization failures, ID allocation, and isolation. The policy runner executes
-70 explicit vectors on each backend and rejects timestamps passed as payment
+The spending runner includes administration checks and validates the full ABI,
+real transfers, exact events/errors, rollback, and hostile callbacks.
+The policy runner executes 70 explicit vectors on each backend and rejects timestamps passed as payment
 amounts. The Phase 0 runner executes reference
 examples, budget and payment tests, expected compilation failure, release build,
 and a fresh local Anvil Osaka chain. It stops that chain
@@ -41,7 +43,8 @@ after checking real transaction receipts, balances, accounting, and error bytes.
 | Code access | An external consumer with `mut Budget` compiles; the same consumer with read-only `Budget` fails with diagnostic `8-0037`. |
 | Runtime authority | Treasury administration binds actual `Ctx::caller`; unapproved callers fail, while a contract owner can create/revoke. |
 | Persistence | Revoked records retain their ID and fields; later creation does not revive them or corrupt another grant. |
-| Payment and rollback | The Phase 0 probe moves ETH; recipient rejection yields `PaymentFailed()` and restores accounting/balances. Full treasury spending is next. |
+| Payment and rollback | The treasury transfers ETH only under current grant policy; rejecting recipients and failed callbacks roll back accounting, balances, and logs. |
+| Shared lock | Authorized callback mutations fail with `Reentrant()`; later valid calls in the same transaction still work. |
 
 ## Scope and trust
 
@@ -51,21 +54,21 @@ dependency. `PaymentProbe` is a separate experiment using actual EVM context,
 a fixed recipient, and the standard library's transient mutex.
 `policy/` holds the tested pure grant policy with read-only context and typed
 amount/time/identifier values. It returns proposed transitions without mutation.
-`treasury/` integrates creation/revocation policy with a private persistent grant
-store and the shared mutex. Its six-function administrative ABI is deployed and
-tested locally. Deposit and spend currently revert as unsupported calls.
+`treasury/` binds that policy to current EVM context, a private persistent grant
+store, and one shared mutex for every mutation. The full eight-function ABI is
+deployed and tested locally, including ETH payments and exclusive expiry.
 
 The trusted boundary assembles capabilities and checks runtime authority. This
-does not sandbox hostile trusted code. Runtime spend/expiry enforcement,
-payment and spend-event integration, the callback attack matrix, second consumer,
-and security audit remain incomplete.
+does not sandbox hostile trusted code. A second independent consumer, broader
+compile-fail API proofs, adversarial review, and a security audit remain incomplete. Callback tests cover the modes
+listed in Phase 3 results; they are not a proof against every hostile program.
 No application unsafe code was introduced. The pinned stdlib supplies EVM internals.
 
 Read [the feasibility evidence](docs/feasibility.md),
 [the implementation plan](docs/reference/FE_CAPABILITIES_PLAN.md), and
 [the language reference](docs/reference/FE_AGENT_REFERENCE.md).
-Next: Phase 3, implement deposit, protected spending, payment rollback, and
-hostile callback tests against the same persistent state and shared mutex.
+Next: Phase 4, prove reuse through a second consumer and external compile-fail
+fixtures for the policy library’s access boundaries.
 
 ## Repository and provenance
 

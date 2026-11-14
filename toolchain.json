@@ -36,7 +36,7 @@
   },
   "evm_fork": "osaka",
   "solidity_version": null,
-  "status": "Phases 0–2 verified on 2026-11-14; Phase 3 pending.",
+  "status": "Phases 0–3 verified on 2026-11-14; Phase 4 pending.",
   "execution": {
     "backend": "sonatina",
     "optimization": "1",
@@ -52,7 +52,7 @@
     "external": []
   },
   "fixture_schema_version": 1,
-  "solidity_usage": "Not used in Phase 0; all deployed contracts are Fe.",
+  "solidity_usage": "Not used; all deployed application and recipient contracts are Fe.",
   "policy_vectors_schema_version": 1,
   "local_ingots": {
     "capabilities_policy": {
@@ -67,5 +67,6 @@
       "revision": "same repository commit"
     }
   },
-  "administration_evidence_schema_version": 1
+  "administration_evidence_schema_version": 1,
+  "spending_evidence_schema_version": 1
 }
