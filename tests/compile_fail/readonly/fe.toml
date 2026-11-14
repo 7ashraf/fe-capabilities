@@ -1,0 +1,6 @@
+[ingot]
+name = "readonly"
+version = "0.1.0"
+
+[dependencies]
+capabilities = { path = "../../../spike" }

@@ -1,0 +1,14 @@
+use capabilities::{Budget, reserve}
+
+fn consumer() uses (budget: Budget) {
+    assert!(reserve(amount: 9).is_ok())
+}
+
+#[test]
+fn consumer_reserves_budget() {
+    var budget = Budget { left: 25 }
+    with (mut budget) {
+        consumer()
+    }
+    assert!(budget.left == 16)
+}

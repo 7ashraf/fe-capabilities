@@ -36,5 +36,21 @@
   },
   "evm_fork": "osaka",
   "solidity_version": null,
-  "status": "Workspace bootstrap; project-specific execution settings remain Phase 0 work."
+  "status": "Phase 0 verified on 2026-11-14; Phase 1 pending.",
+  "execution": {
+    "backend": "sonatina",
+    "optimization": "1",
+    "test_profile": "test",
+    "build_profile": "release",
+    "arithmetic": "checked",
+    "evm_fork": "osaka",
+    "reference_pure_backend": "native"
+  },
+  "dependencies": {
+    "core": "bundled with pinned Fe compiler",
+    "std": "bundled with pinned Fe compiler",
+    "external": []
+  },
+  "fixture_schema_version": 1,
+  "solidity_usage": "Not used in Phase 0; all deployed contracts are Fe."
 }

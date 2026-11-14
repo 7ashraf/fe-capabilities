@@ -1,0 +1,59 @@
+use std::abi::sol
+
+msg MeterMsg {
+    #[selector = sol("add(uint256)")]
+    Add { quantity: u256 },
+    #[selector = sol("total()")]
+    Total -> u256,
+}
+
+#[error]
+struct EmptyQuantity {}
+
+pub contract Meter {
+    mut total: u256,
+
+    init() uses (mut total) { total = 0 }
+
+    recv MeterMsg {
+        Add { quantity } uses (mut total) {
+            if quantity == 0 {
+                revert_error(EmptyQuantity {})
+            }
+            total += quantity
+        }
+        Total -> u256 uses (total) {
+            total
+        }
+    }
+}
+
+#[test]
+fn meter_round_trip() uses (evm: mut Evm) {
+    let target = evm.create2<Meter>(value: Wei::zero(), args: (), salt: 7)
+    evm.call(
+        addr: target,
+        gas: 100000,
+        value: Wei::zero(),
+        message: MeterMsg::Add { quantity: 13 },
+    )
+    let observed: u256 = evm
+        .call(
+            addr: target,
+            gas: 100000,
+            value: Wei::zero(),
+            message: MeterMsg::Total {},
+        )
+    assert!(observed == 13)
+}
+
+#[test(should_revert)]
+fn meter_rejects_zero() uses (evm: mut Evm) {
+    let target = evm.create2<Meter>(value: Wei::zero(), args: (), salt: 9)
+    evm.call(
+        addr: target,
+        gas: 100000,
+        value: Wei::zero(),
+        message: MeterMsg::Add { quantity: 0 },
+    )
+}

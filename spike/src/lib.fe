@@ -1,77 +1,231 @@
-// A simple Counter contract to get you started.
-// Run `fe test` to see it in action!
-
 use std::abi::sol
-use std::evm::{Evm, Call}
+use std::evm::{Call, Ctx, Mutex, wei, is_error}
 
-// Messages define your contract's public interface.
-// Each variant becomes a callable function with a unique selector.
-// The `sol()` const fn computes the standard Solidity selector at compile time.
-msg CounterMsg {
-    #[selector = sol("increment()")]
-    Increment,
-    #[selector = sol("get()")]
-    Get -> u256,
+// Concrete application-owned effect: no EVM or payment dependency.
+pub struct Budget { pub left: u256 }
+
+pub enum ReserveError {
+    Empty,
+    TooLarge,
 }
 
-// Storage is defined as a regular struct.
-// Its fields are persisted on-chain between calls.
-struct CounterStore {
-    value: u256,
-}
-
-// The contract itself: declares its storage and handles messages.
-pub contract Counter {
-    mut store: CounterStore
-
-    // The constructor runs once when the contract is deployed.
-    init() uses (mut store) {
-        store.value = 0
+pub fn reserve(amount: u256) -> Result<ReserveError, u256>
+uses (budget: mut Budget)
+{
+    if amount == 0 {
+        return Err(ReserveError::Empty)
     }
-
-    // The recv block routes incoming messages to handlers.
-    recv CounterMsg {
-        Increment uses (mut store) {
-            store.value = store.value + 1
-        }
-
-        Get -> u256 uses (store) {
-            store.value
-        }
+    if amount > budget.left {
+        return Err(ReserveError::TooLarge)
     }
+    budget.left -= amount
+    Ok(budget.left)
 }
 
-// Tests can deploy and interact with contracts.
-// Run with: fe test
 #[test]
-fn test_counter() uses (evm: mut Evm) {
-    // Deploy the contract
-    let addr = evm.create2<Counter>(value: Wei::zero(), args: (), salt: 0)
-    assert!(addr.word() != 0)
+fn reserve_rejects_without_mutation() {
+    var budget = Budget { left: 25 }
+    with (mut budget) {
+        match reserve(amount: 0) {
+            Err(ReserveError::Empty) => {},
+            _ => assert!(false),
+        }
+        match reserve(amount: 26) {
+            Err(ReserveError::TooLarge) => {},
+            _ => assert!(false),
+        }
+    }
+    assert!(budget.left == 25)
+}
 
-    // Initially the counter is 0
-    let val: u256 = evm.call(
-        addr: addr,
-        gas: 100000,
-        value: Wei::zero(),
-        message: CounterMsg::Get {}
-    )
-    assert!(val == 0)
+#[test]
+fn reserve_exact_budget() {
+    var budget = Budget { left: 25 }
+    with (mut budget) {
+        match reserve(amount: 25) {
+            Ok(left) => assert!(left == 0),
+            Err(_) => assert!(false),
+        }
+    }
+    assert!(budget.left == 0)
+}
 
-    // Increment the counter
+msg PaymentMsg {
+    #[selector = sol("deposit()")]
+    Deposit,
+    #[selector = sol("pay(uint256)")]
+    Pay { amount: u256 },
+    #[selector = sol("paid()")]
+    Paid -> u256,
+}
+
+#[error]
+struct PaymentFailed {}
+#[error]
+struct Unauthorized {}
+#[error]
+struct InvalidAmount {}
+#[error]
+struct Reentrant {}
+#[error]
+struct RecipientRejected {}
+
+// Feasibility probe only: no grants, expiry, events, or treasury-v0 ABI yet.
+pub contract PaymentProbe uses (ctx: Ctx, call: mut Call) {
+    owner: Address,
+    recipient: Address,
+    mut paid: Mutex<u256>,
+
+    init(to: Address)
+    uses (ctx, mut owner, mut recipient)
+    {
+        owner = ctx.caller()
+        recipient = to
+    }
+
+    recv PaymentMsg {
+        #[payable]
+        Deposit uses (mut paid) {
+            if !paid.try_lock() {
+                revert_error(Reentrant {})
+            }
+            paid.unlock()
+        }
+
+        Pay { amount } uses (ctx, mut call, owner, recipient, mut paid) {
+            if !paid.try_lock() {
+                revert_error(Reentrant {})
+            }
+            if ctx.caller() != owner {
+                revert_error(Unauthorized {})
+            }
+            if amount == 0 {
+                revert_error(InvalidAmount {})
+            }
+            paid.value() += amount
+            let result = call.send_value(addr: recipient, gas: 100000, value: wei(amount))
+            if !result.success() {
+                revert_error(PaymentFailed {})
+            }
+            paid.unlock()
+        }
+
+        Paid -> u256 uses (paid) {
+            paid.peek()
+        }
+    }
+}
+
+// Accept/reject empty-calldata ETH calls explicitly.
+pub contract AcceptingRecipient {
+    recv {
+        #[payable]
+        _ {}
+    }
+}
+
+pub contract RejectingRecipient {
+    recv {
+        #[payable]
+        _ {
+            revert_error(RecipientRejected {})
+        }
+    }
+}
+
+#[test(balance = 1000)]
+fn payment_moves_eth_and_unlocks_for_second_call() uses (evm: mut Evm) {
+    let recipient = evm.create2<AcceptingRecipient>(value: Wei::zero(), args: (), salt: 1)
+    let probe = evm.create2<PaymentProbe>(value: Wei::zero(), args: (recipient,), salt: 2)
     evm.call(
-        addr: addr,
-        gas: 100000,
-        value: Wei::zero(),
-        message: CounterMsg::Increment {}
+        addr: probe,
+        gas: 300000,
+        value: wei(100),
+        message: PaymentMsg::Deposit {},
     )
+    assert!(evm.balance(probe) == wei(100))
+    assert!(evm.balance(recipient) == Wei::zero())
+    evm.call(
+        addr: probe,
+        gas: 300000,
+        value: Wei::zero(),
+        message: PaymentMsg::Pay { amount: 7 },
+    )
+    assert!(evm.balance(recipient) == wei(7))
+    assert!(evm.balance(probe) == wei(93))
+    let paid: u256 = evm
+        .call(
+            addr: probe,
+            gas: 100000,
+            value: Wei::zero(),
+            message: PaymentMsg::Paid {},
+        )
+    assert!(paid == 7)
+    // Both calls occur inside one test transaction: transient lock must unlock.
+    evm.call(
+        addr: probe,
+        gas: 300000,
+        value: Wei::zero(),
+        message: PaymentMsg::Pay { amount: 3 },
+    )
+    assert!(evm.balance(recipient) == wei(10))
+    assert!(evm.balance(probe) == wei(90))
+    let paid: u256 = evm
+        .call(
+            addr: probe,
+            gas: 100000,
+            value: Wei::zero(),
+            message: PaymentMsg::Paid {},
+        )
+    assert!(paid == 10)
+}
 
-    // Now it should be 1
-    let val: u256 = evm.call(
-        addr: addr,
-        gas: 100000,
-        value: Wei::zero(),
-        message: CounterMsg::Get {}
+#[test(balance = 1000)]
+fn recipient_rejection_rolls_back_payment_and_accounting() uses (evm: mut Evm) {
+    let recipient = evm.create2<RejectingRecipient>(value: Wei::zero(), args: (), salt: 1)
+    // Positive evidence the recipient deliberately rejects, rather than failing deployment.
+    let direct = evm
+        .try_call_raw(
+            addr: recipient,
+            gas: 100000,
+            value: wei(1),
+            args: core::ptr::MemSpan::empty(),
+        )
+    assert!(!direct.success())
+    assert!(is_error<RecipientRejected>(direct.returndata()))
+    let probe = evm.create2<PaymentProbe>(value: Wei::zero(), args: (recipient,), salt: 2)
+    evm.call(
+        addr: probe,
+        gas: 300000,
+        value: wei(100),
+        message: PaymentMsg::Deposit {},
     )
-    assert!(val == 1)
+    let outcome = evm
+        .try_call(
+            addr: probe,
+            gas: 300000,
+            value: Wei::zero(),
+            message: PaymentMsg::Pay { amount: 7 },
+        )
+    assert!(!outcome.success())
+    assert!(is_error<PaymentFailed>(outcome.returndata()))
+    assert!(outcome.returndata_len() == 4)
+    assert!(evm.balance(recipient) == Wei::zero())
+    assert!(evm.balance(probe) == wei(100))
+    let paid: u256 = evm
+        .call(
+            addr: probe,
+            gas: 100000,
+            value: Wei::zero(),
+            message: PaymentMsg::Paid {},
+        )
+    assert!(paid == 0)
+    // A later guarded entry in this transaction works after revert restored the lock.
+    evm.call(
+        addr: probe,
+        gas: 300000,
+        value: wei(1),
+        message: PaymentMsg::Deposit {},
+    )
+    assert!(evm.balance(probe) == wei(101))
 }
