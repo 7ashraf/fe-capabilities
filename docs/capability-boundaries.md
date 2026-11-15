@@ -76,5 +76,5 @@ rollback. Existing runtime tests establish the listed authority/payment cases,
 while the compile-fail cases establish their narrower code-access properties.
 
 See [policy API](policy-api.md), [treasury spending results](phase3.md), and
-[sponsorship example](../examples/sponsorship/README.md). Additional independent
-adversarial review and defect-detection measurements remain Phase 5 work.
+[sponsorship example](../examples/sponsorship/README.md). Phase 5 [internal review and defect-detection measurements](phase5.md) are
+recorded. Independent developer feedback remains pending.

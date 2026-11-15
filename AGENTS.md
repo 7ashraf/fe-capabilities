@@ -5,10 +5,13 @@ existing history when adding a remote and pushing.
 
 Read `docs/reference/FE_AGENT_REFERENCE.md` and
 `docs/reference/FE_CAPABILITIES_PLAN.md` before implementation. Work on the first incomplete
-phase and its exit gate; Phases 0–4 are complete. Phase 5 technical work is verified; independent
-developer feedback remains pending (see `docs/phase5.md` and
-`docs/reviewer-feedback.md`). Do not claim outside review or start Phase 6
-until actual feedback is recorded or the owner explicitly waives that task.
+phase and its exit gate. Phases 0–4 are complete; Phase 5 technical checks pass,
+with independent developer feedback still pending. On 15 November 2026 the owner
+authorized Phase 6 local preparation while retaining that outstanding task.
+This is not a waiver or a claim of outside review. Local handoff preparation is
+complete; see `docs/phase6.md` and `docs/handoff.md`.
+Preserve frozen source/spec pins and existing history. Any behavior change needs
+an explicit source/spec/evidence/pin update and appropriate verification.
 
 Use Fe 26.5.0 at commit `3dab95f8eebdccf9a2382bb59a33f7bbd03540ca`.
 From this repository root, run `python3 scripts/bootstrap-fe.py` when needed,

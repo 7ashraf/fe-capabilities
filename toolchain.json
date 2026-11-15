@@ -36,7 +36,7 @@
   },
   "evm_fork": "osaka",
   "solidity_version": null,
-  "status": "Phases 0–4 complete; Phase 5 technical checks verified on 2026-11-14; independent developer feedback pending.",
+  "status": "Implementation and Phase 6 local handoff verified on 2026-11-15; independent developer feedback remains pending.",
   "execution": {
     "backend": "sonatina",
     "optimization": "1",
@@ -91,5 +91,28 @@
   "sponsorship_evidence_schema_version": 1,
   "mutation_evidence_schema_version": 1,
   "review_evidence_schema_version": 1,
-  "demo_evidence_schema_version": 1
+  "demo_evidence_schema_version": 1,
+  "independent_review": {
+    "status": "pending",
+    "waived": false,
+    "phase6_preparation_authorized_on": "2026-11-15"
+  },
+  "handoff": {
+    "version": "0.1.0",
+    "prepared_on": "2026-11-15",
+    "license": "MIT",
+    "frozen_source_sha256": {
+      "policy/fe.toml": "7362f48804e22c52f5f7ea79737ed08e378f7faf1b9c7d92e35387ee7628908f",
+      "policy/src/lib.fe": "ef2c9b2a24b78080b59705bccc2d94cf25ecf8ed9c8558c0a92ee19e98acc6f9",
+      "policy/src/policy.fe": "97695eb46b585df2322b8f8203eb679c1479e477b6499e67f19da9dd9ffab1f0",
+      "policy/src/types.fe": "f0e6fae2aa8bde5c281b9d4918d2bde3bc46c726a4673cfda769cc1a6519a3a7",
+      "treasury/fe.toml": "fe89a8666dd1b9947a80ee4d8848e8a55f44b5b3225e22317ce8b253837a972e",
+      "treasury/src/lib.fe": "5acc23870070e8226627297ab523c80b0030a30f4fad3d836ff057f67dcbef21",
+      "examples/sponsorship/fe.toml": "2884e2fe116b349f5daa7b602854e937213db6952ec76859fa621634ffb4fc68",
+      "examples/sponsorship/src/lib.fe": "73d4c754829d555516cebfb3a6ac69123e7a9a9aef8fdbe89be6de5eae60fc54",
+      "spec/treasury-v0.md": "86d2992791fe8de7577ec9c5a51101bcd214c019305938e08dcb4f439e7acd45",
+      "spec/treasury-v0.abi.json": "50b6894b82c9158cac85aa373b85bd3dc227326db5b9bf07eb2bc2da5251323f",
+      "examples/sponsorship/abi.json": "a307a019b4bf107b4f60ce888a68c84b1f1e34676f6aaf45da8b18b24c6841f3"
+    }
+  }
 }

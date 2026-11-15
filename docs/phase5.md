@@ -115,4 +115,5 @@ back. No feedback has been received or invented. The local review bundle is
 ready for the user to hand off; it preserves main's commit history. Record actual
 feedback and address findings in `reviewer-feedback.md`, or obtain an explicit
 owner waiver of that task, before marking the full phase complete.
-Phase 6 final freeze/license/handoff has not started.
+On 15 November 2026 the owner authorized Phase 6 preparation in parallel,
+without waiving outside feedback. See [the local handoff](phase6.md).

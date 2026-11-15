@@ -5,6 +5,8 @@ Do not replace this status with a claimed independent review based on automated
 checks, mutation results, a fresh clone run by the implementing agent, or a
 prepared bundle. The full Phase 5 task remains pending until actual feedback is
 recorded or the project owner explicitly waives this task.
+On 15 November 2026 the owner authorized Phase 6 preparation in parallel.
+That authorization does not waive the feedback task or claim it complete.
 
 The reviewer can use an alias; record the relationship to implementation so the
 scope of independence is clear. Keep their actual observations, including setup
@@ -36,19 +38,21 @@ failures and misunderstandings. Do not prefill successful answers for them.
 
 ## Local handoff
 
-After the Phase 5 technical commit, the workspace prepares an ignored
-`.tools/fe-capabilities-review.bundle` containing the main branch and its history.
+The final local handoff prepares ignored
+`.tools/fe-capabilities-handoff.bundle` containing the main branch and its history.
+The earlier `.tools/fe-capabilities-review.bundle` is the historical Phase 5 snapshot.
 It is a local artifact; no invitation or source was sent to anyone automatically.
 Give that file to the chosen reviewer through the user's preferred channel.
 The reviewer can clone it without a hosted remote:
 
 ```sh
-git clone --branch main fe-capabilities-review.bundle fe-capabilities-review
+git clone --branch main fe-capabilities-handoff.bundle fe-capabilities-review
 cd fe-capabilities-review
 python3 scripts/bootstrap-fe.py
 source scripts/env.sh
+python3 scripts/doctor.py
 python3 scripts/demo.py
-python3 scripts/verify-review.py
+python3 scripts/verify-handoff.py
 git rev-parse HEAD
 git status --short
 ```

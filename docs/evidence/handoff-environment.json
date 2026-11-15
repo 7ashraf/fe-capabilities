@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "python": "3.14.6",
+  "os": "Darwin",
+  "architecture": "arm64",
+  "fe": "fe 26.5.0 (3dab95f)",
+  "fe_asset": "fe_mac_arm64",
+  "fe_sha256": "4968711c5bc02c1a3151cfaea0d81a48dc74803ea208362022af467c2a523fed",
+  "foundry": {
+    "anvil": "anvil Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf",
+    "cast": "cast Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf"
+  },
+  "evm_fork": "osaka",
+  "independent_review": "pending"
+}
