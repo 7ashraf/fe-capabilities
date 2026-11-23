@@ -93,6 +93,8 @@ Project-authored work is [MIT licensed](LICENSE). [NOTICE.md](NOTICE.md) records
 supplied plans/examples, compiler-generated scaffolding, upstream Fe primitives,
 licenses, and Codex assistance. `spike/` remains separate feasibility evidence;
 the reusable implementation is in `policy/` and its two consumers.
+The [contest submission summary](docs/submission.md) links the manifests,
+demo, and release checks.
 
 This directory is an independent Git repository. Preserve its existing branch
 history when assigning its own remote and pushing. The local handoff command:
